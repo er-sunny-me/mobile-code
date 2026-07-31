@@ -26,7 +26,7 @@ jobs:
       run: ./gradlew assembleRelease
 
     - name: Upload Release APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v7
       with:
         name: Novus-IDE-Release-APK
         path: app/build/outputs/apk/release/*.apk
