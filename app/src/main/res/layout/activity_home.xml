@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawer_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Main Content (Existing Home Screen) -->
+    <RelativeLayout
+        android:id="@+id/home_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/zc_app_bg"
+        android:fitsSystemWindows="true">
+
+        <!-- Top App Bar -->
+        <LinearLayout
+            android:id="@+id/top_app_bar"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:background="@color/zc_app_bg">
+
+            <!-- Hamburger Menu (Actually opens the new drawer) -->
+            <ImageButton
+                android:id="@+id/btn_menu"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_sort_by_size"
+                app:tint="@color/zc_text_white" />
+
+            <!-- Title -->
+            <TextView
+                android:id="@+id/tv_app_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Novus IDE"
+                android:textColor="@color/zc_text_white"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_marginStart="16dp" />
+
+            <!-- Run Button (Editor mode only) -->
+            <ImageButton
+                android:id="@+id/btn_home_editor_run"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_media_play"
+                android:visibility="gone"
+                app:tint="@color/zc_text_gray" />
+
+            <!-- Save Button (Editor mode only) -->
+            <ImageButton
+                android:id="@+id/btn_home_editor_save"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_save"
+                android:visibility="gone"
+                app:tint="@color/zc_text_gray" />
+
+            <!-- Close Button (Editor mode only) -->
+            <ImageButton
+                android:id="@+id/btn_home_editor_close"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:visibility="gone"
+                app:tint="@color/zc_text_gray" />
+
+            <!-- Settings Button -->
+            <ImageButton
+                android:id="@+id/btn_settings"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_settings"
+                app:tint="@color/zc_text_gray" />
+        </LinearLayout>
+
+        <!-- Empty State Container (Centered) -->
+        <LinearLayout
+            android:id="@+id/empty_state_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/top_app_bar"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="visible">
+
+            <ImageView
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:src="@drawable/ic_folder_new"
+                app:tint="@color/zc_text_muted"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:id="@+id/tv_empty_state_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Novus IDE"
+                android:textColor="@color/zc_text_secondary"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+                
+            <TextView
+                android:id="@+id/tv_empty_state_subtext"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Swipe right or tap the top-left menu to browse your workspace."
+                android:textColor="@color/zc_text_muted"
+                android:textSize="14sp"
+                android:gravity="center"
+                android:paddingHorizontal="32dp"
+                android:layout_marginBottom="24dp" />
+
+            <Button
+                android:id="@+id/btn_open_folder_main"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:backgroundTint="@color/zc_red_primary"
+                android:textColor="@color/zc_text_white"
+                android:text="Open Workspace Folder"
+                android:paddingHorizontal="32dp"
+                android:paddingVertical="12dp"
+                android:gravity="center"
+                android:textAllCaps="false"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <!-- Editor Container (Initially Hidden) -->
+        <LinearLayout
+            android:id="@+id/editor_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/top_app_bar"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <!-- Tab Bar Container -->
+            <HorizontalScrollView
+                android:id="@+id/tab_scroll_view"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:background="@color/zc_bg_deep"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/tab_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+            <com.termux.app.LineNumberEditText
+                android:id="@+id/et_home_code"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@color/zc_terminal_bg"
+                android:textColor="@color/zc_text_primary"
+                android:textColorHint="@color/zc_text_muted"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:gravity="top|start"
+                android:paddingTop="16dp"
+                android:paddingBottom="16dp"
+                android:paddingEnd="16dp"
+                android:scrollbars="vertical|horizontal"
+                android:inputType="textMultiLine|textNoSuggestions|textVisiblePassword"
+                android:hint="Type your code here..." />
+        </LinearLayout>
+
+        <!-- Floating Terminal Button -->
+        <ImageButton
+            android:id="@+id/btn_terminal_fab"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentStart="true"
+            android:layout_marginStart="24dp"
+            android:layout_marginBottom="24dp"
+            android:background="@drawable/bg_fab_dark"
+            android:src="@drawable/ic_terminal"
+            app:tint="@color/zc_text_white"
+            android:elevation="4dp" />
+
+
+
+    </RelativeLayout>
+
+    <!-- Sidebar Drawer -->
+    <include layout="@layout/drawer_workspace" />
+
+</androidx.drawerlayout.widget.DrawerLayout>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/error_explain_chip_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="16dp"
+    android:layout_gravity="bottom"
+    android:layout_marginBottom="64dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="8dp"
+    app:cardBackgroundColor="#2A2A2A">
+
+    <LinearLayout 
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp" 
+        android:gravity="center_vertical">
+
+        <!-- Red dot indicator -->
+        <View 
+            android:layout_width="8dp" 
+            android:layout_height="8dp"
+            android:background="@drawable/circle_red"
+            android:layout_marginEnd="8dp"/>
+
+        <TextView android:id="@+id/error_label"
+            android:layout_width="0dp" 
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#FFFFFF"
+            android:fontFamily="sans-serif-medium"
+            android:text="Error detected"
+            android:textSize="13sp"/>
+
+        <Button android:id="@+id/btn_explain"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="Explain Error"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#D32F2F"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:layout_marginEnd="8dp"/>
+
+        <ImageButton android:id="@+id/btn_dismiss"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:tint="#888888" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

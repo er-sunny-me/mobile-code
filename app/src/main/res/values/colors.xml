@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ZeroCode-Studio Brand Colors (Dark & Red Theme) -->
+    <color name="zc_bg_deep">#000000</color>
+    <color name="zc_bg_dark">#080808</color>
+    <color name="zc_bg_card">#111111</color>
+    <color name="zc_bg_surface">#1A1A1A</color>
+    
+    <!-- Changed from Cyan to Red -->
+    <color name="zc_red_primary">#FF3B30</color>
+    <color name="zc_red_dark">#CC2E26</color>
+    <color name="zc_red_glow">#33FF3B30</color>
+    
+    <color name="zc_green_accent">#39FF14</color>
+    <color name="zc_purple_accent">#8B5CF6</color>
+    
+    <color name="zc_text_primary">#E0E0E0</color>
+    <color name="zc_text_secondary">#888888</color>
+    <color name="zc_text_muted">#555555</color>
+    <color name="zc_border">#222222</color>
+    
+    <color name="zc_white">#FFFFFF</color>
+    <color name="zc_black">#000000</color>
+    <color name="zc_terminal_bg">#000000</color>
+    <color name="zc_terminal_cursor">#FF3B30</color>
+    
+    <color name="zc_success">#3FB950</color>
+    <color name="zc_warning">#D29922</color>
+    <color name="zc_error">#FF3B30</color>
+
+    <!-- Legacy compatibility -->
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="red_400">#F85149</color>
+    <color name="grey_500">#21262D</color>
+</resources>

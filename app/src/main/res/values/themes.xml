@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ZeroCode-Studio Base Themes -->
+    <style name="Theme.TermuxApp.Light.DarkActionBar" parent="Theme.BaseActivity.Light.DarkActionBar" />
+
+    <style name="Theme.TermuxApp.Light.NoActionBar" parent="Theme.BaseActivity.Light.NoActionBar" />
+
+    <style name="Theme.TermuxApp.DayNight.DarkActionBar" parent="Theme.BaseActivity.DayNight.DarkActionBar" />
+
+    <style name="Theme.TermuxApp.DayNight.NoActionBar" parent="Theme.BaseActivity.DayNight.NoActionBar" />
+
+    <!-- ZeroCode-Studio Home Activity Theme -->
+    <style name="Theme.ZeroCode.Home" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">@color/zc_red_primary</item>
+        <item name="colorPrimaryVariant">@color/zc_red_dark</item>
+        <item name="colorOnPrimary">@color/zc_bg_deep</item>
+        <item name="colorSecondary">@color/zc_purple_accent</item>
+        <item name="android:windowBackground">@color/zc_bg_deep</item>
+        <item name="android:statusBarColor">@color/zc_bg_deep</item>
+        <item name="android:navigationBarColor">@color/zc_bg_deep</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- ZeroCode-Studio Terminal Activity Theme (Dark) -->
+    <style name="Theme.TermuxActivity.DayNight.NoActionBar" parent="Theme.TermuxApp.DayNight.NoActionBar">
+        <!-- Primary brand color -->
+        <item name="colorPrimary">@color/zc_terminal_bg</item>
+        <item name="colorPrimaryVariant">@color/zc_terminal_bg</item>
+
+        <item name="android:windowBackground">@color/zc_terminal_bg</item>
+
+        <!-- Avoid action mode toolbar pushing down terminal content -->
+        <item name="android:windowActionModeOverlay">true</item>
+
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+
+        <item name="android:windowAllowReturnTransitionOverlap">true</item>
+        <item name="android:windowAllowEnterTransitionOverlap">true</item>
+
+        <!-- Left drawer — ZeroCode-Studio dark style -->
+        <item name="buttonBarButtonStyle">@style/ZeroCode.Drawer.ButtonBarStyle</item>
+        <item name="termuxActivityDrawerBackground">@color/zc_bg_card</item>
+        <item name="termuxActivityDrawerImageTint">@color/zc_red_primary</item>
+
+        <!-- Extra keys — ZeroCode-Studio colors -->
+        <item name="extraKeysButtonTextColor">@color/zc_text_primary</item>
+        <item name="extraKeysButtonActiveTextColor">@color/zc_red_primary</item>
+        <item name="extraKeysButtonBackgroundColor">@color/zc_bg_surface</item>
+        <item name="extraKeysButtonActiveBackgroundColor">@color/zc_bg_card</item>
+    </style>
+
+    <!-- ZeroCode-Studio Drawer Button Style -->
+    <style name="ZeroCode.Drawer.ButtonBarStyle" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:textColor">@color/zc_red_primary</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:padding">8dp</item>
+    </style>
+
+    <!-- ZeroCode-Studio Terminal Activity Bottom Sheet Theme -->
+    <style name="Theme.TermuxActivity.BottomSheet" parent="Theme.TermuxApp.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.5</item>
+
+        <item name="colorPrimary">@color/zc_terminal_bg</item>
+        <item name="colorPrimaryVariant">@color/zc_terminal_bg</item>
+        <item name="termuxActivityDrawerBackground">@color/zc_bg_card</item>
+        <item name="termuxActivityDrawerImageTint">@color/zc_red_primary</item>
+
+        <!-- Extra keys — ZeroCode-Studio custom styles -->
+        <item name="extraKeysButtonTextColor">@color/zc_term_key_text</item>
+        <item name="extraKeysButtonActiveTextColor">@color/zc_text_white</item>
+        <item name="extraKeysButtonBackgroundColor">@color/zc_term_key_bg</item>
+        <item name="extraKeysButtonActiveBackgroundColor">@color/zc_term_key_bg_active</item>
+
+        <!-- Animations handled in code or via windowAnimationStyle -->
+        <item name="android:windowAnimationStyle">@style/Animation.ZeroCode.BottomSheet</item>
+    </style>
+
+    <!-- Bottom Sheet Animation Style -->
+    <style name="Animation.ZeroCode.BottomSheet" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/slide_up</item>
+        <item name="android:activityOpenExitAnimation">@anim/stay</item>
+        <item name="android:activityCloseEnterAnimation">@anim/stay</item>
+        <item name="android:activityCloseExitAnimation">@anim/slide_down</item>
+    </style>
+
+    <style name="Theme.MyApplication" parent="android:Theme.Material.Light.NoActionBar" />
+
+</resources>

@@ -1,0 +1,135 @@
+{
+  "_note1": "KEEP THIS FILE! Check it into a version control system (VCS) like git.",
+  "_note2": "ObjectBox manages crucial IDs for your object model. See docs for details.",
+  "_note3": "If you have VCS merge conflicts, you must resolve them according to ObjectBox docs.",
+  "entities": [
+    {
+      "id": "1:1919439746793430526",
+      "lastPropertyId": "10:5882281101183155409",
+      "name": "AgentMemory",
+      "properties": [
+        {
+          "id": "1:6702754286908379215",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:6950440676528915911",
+          "name": "agentId",
+          "indexId": "1:8434503700124012219",
+          "type": 5,
+          "flags": 8
+        },
+        {
+          "id": "3:8229410351719488432",
+          "name": "memoryType",
+          "type": 9
+        },
+        {
+          "id": "4:6728169505751971216",
+          "name": "key",
+          "indexId": "2:2689392815503415691",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "5:2667846591962188393",
+          "name": "value",
+          "type": 9
+        },
+        {
+          "id": "6:596926449311519836",
+          "name": "projectId",
+          "type": 9
+        },
+        {
+          "id": "7:191577281354223869",
+          "name": "createdAt",
+          "type": 6
+        },
+        {
+          "id": "8:7098789065820167669",
+          "name": "updatedAt",
+          "type": 6
+        },
+        {
+          "id": "9:4503109581805120895",
+          "name": "relevanceScore",
+          "type": 8
+        },
+        {
+          "id": "10:5882281101183155409",
+          "name": "tags",
+          "type": 9
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "2:3805638938479944792",
+      "lastPropertyId": "9:6907303528405213036",
+      "name": "AgentTask",
+      "properties": [
+        {
+          "id": "1:7266596022611094241",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:5626126495777730063",
+          "name": "agentId",
+          "type": 5
+        },
+        {
+          "id": "3:5906758316974891883",
+          "name": "agentName",
+          "type": 9
+        },
+        {
+          "id": "4:3409130494234734746",
+          "name": "taskPrompt",
+          "type": 9
+        },
+        {
+          "id": "5:2677589187600913097",
+          "name": "taskStatus",
+          "type": 9
+        },
+        {
+          "id": "6:659086962459649286",
+          "name": "timestamp",
+          "type": 6
+        },
+        {
+          "id": "7:7652994513022383863",
+          "name": "projectId",
+          "type": 9
+        },
+        {
+          "id": "8:4569371227160395398",
+          "name": "taskOutput",
+          "type": 9
+        },
+        {
+          "id": "9:6907303528405213036",
+          "name": "phase",
+          "type": 9
+        }
+      ],
+      "relations": []
+    }
+  ],
+  "lastEntityId": "2:3805638938479944792",
+  "lastIndexId": "2:2689392815503415691",
+  "lastRelationId": "0:0",
+  "lastSequenceId": "0:0",
+  "modelVersion": 5,
+  "modelVersionParserMinimum": 5,
+  "retiredEntityUids": [],
+  "retiredIndexUids": [],
+  "retiredPropertyUids": [],
+  "retiredRelationUids": [],
+  "version": 1
+}

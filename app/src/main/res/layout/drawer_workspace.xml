@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="280dp"
+    android:layout_height="match_parent"
+    android:layout_gravity="start"
+    android:background="#1E1E1E"
+    android:orientation="vertical"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Header Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:background="#181818">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="WORKSPACE"
+            android:textColor="#A0A0A0"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1" />
+
+        <!-- Exit Workspace Action -->
+        <ImageButton
+            android:id="@+id/btn_workspace_exit"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_logout"
+            app:tint="@color/zc_primary_red" />
+
+        <!-- New Folder Action -->
+        <ImageButton
+            android:id="@+id/btn_workspace_new_folder"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_folder_new"
+            app:tint="#A0A0A0"
+            android:layout_marginStart="4dp" />
+
+        <!-- New File Action -->
+        <ImageButton
+            android:id="@+id/btn_workspace_new_file"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_file_new"
+            app:tint="#A0A0A0"
+            android:layout_marginStart="4dp" />
+
+        <!-- Project Map Action -->
+        <ImageButton
+            android:id="@+id/btn_workspace_project_map"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_dialog_map"
+            app:tint="#64B5F6"
+            android:layout_marginStart="4dp" />
+
+    </LinearLayout>
+
+    <!-- Mode Toggle (Files vs Source Control) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:background="#252526"
+        android:padding="4dp">
+
+        <TextView
+            android:id="@+id/tab_files"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="EXPLORER"
+            android:textColor="#E0E0E0"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:background="#333333" />
+
+        <TextView
+            android:id="@+id/tab_git"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="SOURCE CONTROL"
+            android:textColor="#808080"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:background="@android:color/transparent" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- File Explorer List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_workspace"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingVertical="8dp" />
+
+        <!-- Git Workspace View -->
+        <include layout="@layout/layout_git_workspace" />
+
+    </FrameLayout>
+    
+    <!-- Bottom Action Button -->
+    <Button
+        android:id="@+id/btn_open_folder"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="@color/zc_red_primary"
+        android:textColor="@color/zc_text_white"
+        android:text="Change Workspace Folder"
+        android:padding="12dp"
+        android:layout_margin="16dp"
+        android:textAllCaps="false" />
+
+</LinearLayout>

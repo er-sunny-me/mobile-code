@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.termux.app.terminal.TermuxActivityRootView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/activity_termux_root_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <!-- Transparent spacer for bottom sheet effect -->
+    <View
+        android:id="@+id/view_dim_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="3.5"
+        android:background="@android:color/transparent" />
+
+    <LinearLayout
+        android:id="@+id/activity_termux_root_relative_layout"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="6.5"
+        android:orientation="vertical"
+        android:background="@color/zc_term_bg"
+        android:elevation="16dp">
+
+        <!-- Top Tab Bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/zc_term_tab_inactive"
+            android:orientation="horizontal"
+            android:gravity="bottom">
+
+            <!-- Terminal Tab (Active) -->
+            <LinearLayout
+                android:id="@+id/tab_terminal"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_term_tab_active"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="4dp">
+                <!-- Empty container to hold background, but no text/icon -->
+            </LinearLayout>
+
+            <Spinner
+                android:id="@+id/chat_provider_spinner"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_ai_spinner"
+                android:paddingHorizontal="12dp"
+                android:layout_marginEnd="8dp"
+                android:popupBackground="@color/zc_bg_dark"
+                android:spinnerMode="dropdown" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- Close Button -->
+            <ImageButton
+                android:id="@+id/btn_close_terminal"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                app:tint="@color/zc_text_gray" />
+        </LinearLayout>
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#333333" />
+
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <!-- Main Terminal View -->
+            <androidx.drawerlayout.widget.DrawerLayout
+                android:id="@+id/drawer_layout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+                
+                <com.termux.view.TerminalView
+                    android:id="@+id/terminal_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="8dp"
+                    android:defaultFocusHighlightEnabled="false"
+                    android:focusableInTouchMode="true"
+                    android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
+                    android:scrollbars="vertical"
+                    tools:ignore="UnusedAttribute" />
+                    
+            </FrameLayout>
+
+            <!-- Keeping Left Drawer for existing Termux functions but making it 0dp if not needed, 
+                 or leaving as is for users who swipe from left. -->
+            <LinearLayout
+                android:id="@+id/left_drawer"
+                android:layout_width="240dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="start"
+                android:choiceMode="singleChoice"
+                android:divider="@android:color/transparent"
+                android:dividerHeight="0dp"
+                android:descendantFocusability="blocksDescendants"
+                android:orientation="vertical"
+                android:background="?attr/termuxActivityDrawerBackground">
+                <!-- File Explorer List -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/file_explorer_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:clipToPadding="false" />
+            </LinearLayout>
+
+        </androidx.drawerlayout.widget.DrawerLayout>
+
+
+
+        </FrameLayout>
+
+        <!-- Extra Keys Toolbar (ViewPager from Termux) -->
+        <androidx.viewpager.widget.ViewPager
+            android:id="@+id/terminal_toolbar_view_pager"
+            android:layout_width="match_parent"
+            android:layout_height="34dp"
+            android:background="@color/zc_term_bg"
+            android:paddingHorizontal="4dp"
+            android:paddingVertical="4dp" />
+
+    </LinearLayout>
+
+    <View
+        android:id="@+id/activity_termux_bottom_space_view"
+        android:layout_width="match_parent"
+        android:layout_height="1sp" />
+
+</com.termux.app.terminal.TermuxActivityRootView>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/zc_bg_deep">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/zc_bg_surface"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp">
+
+        <ImageButton
+            android:id="@+id/btn_close"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:tint="@color/zc_text_primary" />
+
+        <TextView
+            android:id="@+id/tv_editor_filename"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:text="filename.txt"
+            android:textColor="@color/zc_text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btn_run"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="16dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_media_play"
+            android:tint="#4CAF50" />
+
+        <ImageButton
+            android:id="@+id/btn_save"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_save"
+            android:tint="@color/zc_red_primary" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/et_code"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@null"
+        android:textColor="@color/zc_text_primary"
+        android:textColorHint="@color/zc_text_muted"
+        android:textSize="14sp"
+        android:fontFamily="monospace"
+        android:gravity="top|start"
+        android:padding="16dp"
+        android:scrollbars="vertical|horizontal"
+        android:inputType="textMultiLine|textNoSuggestions|textVisiblePassword"
+        android:hint="Type your code here..." />
+
+    <LinearLayout
+        android:id="@+id/panel_problems"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1E1E1E"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:minHeight="100dp"
+        android:maxHeight="250dp"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/tv_problems_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Output / Problems"
+            android:textColor="@color/white"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:layout_marginBottom="8dp"/>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <TextView
+                android:id="@+id/tv_problems_output"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FF6B6B"
+                android:textSize="12sp"
+                android:fontFamily="monospace"/>
+        </ScrollView>
+    </LinearLayout>
+
+</LinearLayout>

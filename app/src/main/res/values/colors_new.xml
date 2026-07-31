@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- New ZeroCode Studio Colors -->
+    <color name="zc_app_bg">#0B0B0B</color>
+    <color name="zc_primary_red">#E91E4C</color>
+    <color name="zc_primary_red_dark">#B7173B</color>
+    
+    <color name="zc_text_white">#FFFFFF</color>
+    <color name="zc_text_gray">#888888</color>
+    
+    <!-- Terminal Colors -->
+    <color name="zc_term_bg">#1E1E1E</color>
+    <color name="zc_term_tab_active">#2A2A2A</color>
+    <color name="zc_term_tab_inactive">#121212</color>
+    <color name="zc_term_key_bg">#2D2D2D</color>
+    <color name="zc_term_key_bg_active">#444444</color>
+    <color name="zc_term_key_text">#CCCCCC</color>
+</resources>
