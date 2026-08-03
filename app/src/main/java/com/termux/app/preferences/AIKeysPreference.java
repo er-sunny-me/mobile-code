@@ -75,17 +75,23 @@ public class AIKeysPreference extends Preference {
 
         etCustomCommand.setText(agentManager.getCustomCommand());
 
+        LinearLayout anthropicContainer = (LinearLayout) holder.findViewById(R.id.anthropic_settings_container);
+        EditText etAnthropicToken = (EditText) holder.findViewById(R.id.et_anthropic_auth_token);
+        EditText etAnthropicBaseUrl = (EditText) holder.findViewById(R.id.et_anthropic_base_url);
+        EditText etAnthropicModel = (EditText) holder.findViewById(R.id.et_anthropic_model);
+
+        etAnthropicToken.setText(agentManager.getAnthropicAuthToken());
+        etAnthropicBaseUrl.setText(agentManager.getAnthropicBaseUrl());
+        etAnthropicModel.setText(agentManager.getAnthropicModel());
+
         spinnerProvider.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String selectedAgentId = providerIds[position];
                 agentManager.setSelectedAgent(selectedAgentId);
                 
-                if (selectedAgentId.equals("custom")) {
-                    customContainer.setVisibility(View.VISIBLE);
-                } else {
-                    customContainer.setVisibility(View.GONE);
-                }
+                customContainer.setVisibility(selectedAgentId.equals("custom") ? View.VISIBLE : View.GONE);
+                anthropicContainer.setVisibility(selectedAgentId.equals("claude_code") ? View.VISIBLE : View.GONE);
             }
 
             @Override
@@ -93,16 +99,51 @@ public class AIKeysPreference extends Preference {
             }
         });
 
+        // Initialize visibility on load
+        customContainer.setVisibility(selectedId.equals("custom") ? View.VISIBLE : View.GONE);
+        anthropicContainer.setVisibility(selectedId.equals("claude_code") ? View.VISIBLE : View.GONE);
+
         etCustomCommand.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
             @Override
             public void afterTextChanged(Editable s) {
                 agentManager.setCustomCommand(s.toString());
+            }
+        });
+
+        etAnthropicToken.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                agentManager.setAnthropicAuthToken(s.toString());
+            }
+        });
+
+        etAnthropicBaseUrl.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                agentManager.setAnthropicBaseUrl(s.toString());
+            }
+        });
+
+        etAnthropicModel.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                agentManager.setAnthropicModel(s.toString());
             }
         });
     }

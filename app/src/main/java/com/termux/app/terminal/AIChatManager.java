@@ -26,8 +26,12 @@ public class AIChatManager {
         if (providerSpinner != null) {
             providerSpinner.setVisibility(View.VISIBLE);
             
-            String[] providers = { "Claude Code", "Antigravity CLI", "Aider", "Codex CLI", "Gemini CLI", "Custom Agent" };
-            String[] providerIds = { "claude_code", "antigravity", "aider", "codex", "gemini_cli", "custom" };
+            String[] providers = new String[CLIAgentManager.AGENTS.length];
+            String[] providerIds = new String[CLIAgentManager.AGENTS.length];
+            for (int i = 0; i < CLIAgentManager.AGENTS.length; i++) {
+                providers[i] = CLIAgentManager.AGENTS[i].name;
+                providerIds[i] = CLIAgentManager.AGENTS[i].id;
+            }
             
             ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(activity, android.R.layout.simple_spinner_item, providers);
             spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -80,7 +84,7 @@ public class AIChatManager {
                     String cmd = cliAgentManager.buildLaunchCommand(agent, "", workspace);
                     
                     if (isInitial) {
-                        currentSession.write("clear && " + cmd + "\r");
+                        currentSession.write("clear && " + cmd + "\r\n");
                     } else {
                         // Create a NEW session for the new agent
                         activity.getTermuxTerminalSessionClient().addNewSession(false, agent.name);
@@ -92,11 +96,11 @@ public class AIChatManager {
                                 // Kill the old session
                                 currentSession.finishIfRunning();
                                 // Run command in new session
-                                newSession.write("clear && " + cmd + "\r");
+                                newSession.write("clear && " + cmd + "\r\n");
                             } else {
                                 // Fallback just in case
                                 currentSession.write("\003");
-                                currentSession.write("clear && " + cmd + "\r");
+                                currentSession.write("clear && " + cmd + "\r\n");
                             }
                         }, 500);
                     }

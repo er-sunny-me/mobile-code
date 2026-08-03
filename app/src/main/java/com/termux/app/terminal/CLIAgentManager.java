@@ -72,15 +72,6 @@ public class CLIAgentManager {
             "🔵"
         ),
         new CLIAgent(
-            "aider",
-            "Aider",
-            "AI pair programming in your terminal. Works with any LLM backend.",
-            "aider",
-            "if ! command -v pip &> /dev/null; then apt-get update && apt-get install -y python3-pip || pkg install -y python3 python-pip; fi; pip install aider-chat",
-            "aider --yes-always",
-            "🟢"
-        ),
-        new CLIAgent(
             "codex",
             "Codex CLI",
             "OpenAI's lightweight coding agent for the terminal.",
@@ -90,13 +81,31 @@ public class CLIAgentManager {
             "⚪"
         ),
         new CLIAgent(
-            "gemini_cli",
-            "Gemini CLI",
-            "Google's Gemini-powered coding CLI agent.",
-            "gemini",
-            "if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm install -g @anthropic-ai/gemini-cli",
-            "gemini \"{prompt}\"",
+            "kiro",
+            "Kiro CLI",
+            "Agentic terminal IDE for spec-driven workflows.",
+            "kiro",
+            "if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -fsSL https://cli.kiro.dev/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "export PATH=\"$HOME/.local/bin:$PATH\" && kiro",
+            "🟢"
+        ),
+        new CLIAgent(
+            "kilo",
+            "Kilo CLI",
+            "Multi-model vendor-neutral AI coding assistant.",
+            "kilo",
+            "if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm install -g @kilocode/cli; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "export PATH=\"$HOME/.local/bin:$PATH\" && kilo",
             "🟣"
+        ),
+        new CLIAgent(
+            "opencode",
+            "OpenCode CLI",
+            "Extensible Go-based AI coding TUI with plugins.",
+            "opencode",
+            "if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -fsSL https://opencode.ai/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "export PATH=\"$HOME/.local/bin:$PATH\" && opencode",
+            "🟡"
         ),
         new CLIAgent(
             "custom",
@@ -153,11 +162,6 @@ public class CLIAgentManager {
 
     /**
      * Build the terminal command to launch the given agent.
-     *
-     * @param agent      The CLI agent to launch
-     * @param prompt     User's prompt/instruction for the agent
-     * @param workspace  The workspace directory path
-     * @return Shell command string ready to execute in terminal
      */
     public String buildLaunchCommand(CLIAgent agent, String prompt, String workspace) {
         if (agent.id.equals("custom")) {
@@ -170,11 +174,57 @@ public class CLIAgentManager {
                 .replace("{prompt}", prompt.replace("\"", "\\\""))
                 .replace("{workspace}", workspace);
 
+        // Prepend Anthropic vars if Claude Code is selected
+        if (agent.id.equals("claude_code")) {
+            String authToken = getAnthropicAuthToken();
+            String baseUrl = getAnthropicBaseUrl();
+            String model = getAnthropicModel();
+            
+            StringBuilder exports = new StringBuilder();
+            if (!authToken.isEmpty()) {
+                exports.append("export ANTHROPIC_AUTH_TOKEN=\"").append(authToken).append("\" ");
+            }
+            if (!baseUrl.isEmpty()) {
+                exports.append("export ANTHROPIC_BASE_URL=\"").append(baseUrl).append("\" ");
+            }
+            if (!model.isEmpty()) {
+                exports.append("export ANTHROPIC_MODEL=\"").append(model).append("\" ");
+            }
+            
+            if (exports.length() > 0) {
+                cmd = exports.toString() + "&& " + cmd;
+            }
+        }
+
         if (agent.installCommand != null && !agent.installCommand.isEmpty()) {
             return "cd " + shellEscape(workspace) + " && " + agent.installCommand + " && " + cmd;
         }
 
         return "cd " + shellEscape(workspace) + " && " + cmd;
+    }
+
+    public void setAnthropicAuthToken(String token) {
+        prefs.edit().putString("anthropic_auth_token", token).apply();
+    }
+    
+    public String getAnthropicAuthToken() {
+        return prefs.getString("anthropic_auth_token", "");
+    }
+    
+    public void setAnthropicBaseUrl(String url) {
+        prefs.edit().putString("anthropic_base_url", url).apply();
+    }
+    
+    public String getAnthropicBaseUrl() {
+        return prefs.getString("anthropic_base_url", "");
+    }
+    
+    public void setAnthropicModel(String model) {
+        prefs.edit().putString("anthropic_model", model).apply();
+    }
+    
+    public String getAnthropicModel() {
+        return prefs.getString("anthropic_model", "");
     }
 
     /**

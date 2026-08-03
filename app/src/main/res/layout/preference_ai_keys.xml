@@ -29,12 +29,53 @@
         android:background="?android:attr/editTextBackground"
         android:layout_marginBottom="16dp" />
 
-    <LinearLayout
-        android:id="@+id/custom_command_container"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone">
+        <LinearLayout
+            android:id="@+id/anthropic_settings_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:layout_marginBottom="16dp">
+            
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Anthropic / AgentRouter Settings"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <EditText
+                android:id="@+id/et_anthropic_auth_token"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Auth Token (e.g. sk-ant-api...)"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp" />
+
+            <EditText
+                android:id="@+id/et_anthropic_base_url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Base URL (e.g. https://agentrouter.org)"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp" />
+
+            <EditText
+                android:id="@+id/et_anthropic_model"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Model (e.g. claude-opus-4-6)"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/custom_command_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
         
         <TextView
             android:layout_width="match_parent"
