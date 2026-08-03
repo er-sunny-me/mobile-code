@@ -20,18 +20,29 @@ Whether you're fixing bugs on the go, architecting full applications, or generat
 - 🤖 **Native CLI Agent Launcher**: Run world-class AI agents directly in the terminal via a sleek dropdown menu. Out-of-the-box support for:
   - **Claude Code** (Anthropic's autonomous coding CLI)
   - **Antigravity CLI** (DeepMind's advanced agent)
-  - **Aider** (AI pair programming terminal)
-  - **Codex** & **Gemini CLI**
+  - **Grok CLI** (xAI's coding assistant for the terminal)
+  - **Codex** (OpenAI's lightweight agent)
+  - **Kiro**, **Kilo**, and **OpenCode** CLIs
 - ⚡ **Auto-Bootstrapping**: No complex setup required. The app automatically downloads and installs Node.js, Python, npm, and the required CLI tools for your chosen agent the first time you select it.
 - 🐧 **Full Linux Environment**: A complete Ubuntu-based PRoot Linux environment running on your phone, offering full access to `apt`, `npm`, `pip`, and standard Linux development tools.
 - 🔄 **Smart Session Management**: Seamlessly switch between different AI agents. The app handles background processes safely, ensuring clean terminal sessions without lingering locks or corrupted caches.
-- 🎨 **Aggressive Dark Mode Aesthetic**: Designed for OLED screens with a premium, focused dark theme and blood-red accents.
+- 🎨 **Aggressive Dark Mode Aesthetic**: Designed for OLED screens with a premium, focused dark theme, Material 3 UI, and custom toggle switches.
 
 ## 🚀 Getting Started
 
 ### Installation
 
-1. Download the latest `app-debug.apk` or build it from source.
+<div align="center">
+  <a href="https://github.com/er-sunny-me/mobile-code/releases/latest/download/app-debug.apk">
+    <img src="https://img.shields.io/badge/Download-app--debug.apk-blue?style=for-the-badge&logo=android" alt="Download Debug APK" />
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/er-sunny-me/mobile-code/releases/latest/download/app-release.apk">
+    <img src="https://img.shields.io/badge/Download-app--release.apk-brightgreen?style=for-the-badge&logo=android" alt="Download Release APK" />
+  </a>
+</div>
+
+1. Click on one of the badges above to download the APK.
 2. Install the APK on your Android device (ensure "Install from Unknown Sources" is enabled).
 3. Launch the app. Allow the necessary storage permissions so the AI agents can read and write code to your phone's storage.
 
