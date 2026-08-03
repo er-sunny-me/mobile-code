@@ -1,43 +1,34 @@
 package com.termux.app.preferences;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
+import androidx.appcompat.widget.SwitchCompat;
 
 import androidx.preference.Preference;
 import androidx.preference.PreferenceViewHolder;
 
 import com.termux.R;
 import com.termux.app.terminal.CLIAgentManager;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AIKeysPreference extends Preference {
 
-    private String[] providers = {
-            "Claude Code",
-            "Antigravity CLI",
-            "Aider",
-            "Codex CLI",
-            "Gemini CLI",
-            "Custom Agent"
-    };
-
-    private String[] providerIds = {
-            "claude_code",
-            "antigravity",
-            "aider",
-            "codex",
-            "gemini_cli",
-            "custom"
-    };
-
     private CLIAgentManager agentManager;
+    private Spinner spinnerProvider;
+    private ArrayAdapter<String> adapter;
+    private List<String> enabledProviderIds;
+    private List<String> enabledProviders;
 
     public AIKeysPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -45,37 +36,52 @@ public class AIKeysPreference extends Preference {
         agentManager = new CLIAgentManager(context);
     }
 
+    private void updateSpinnerAdapter() {
+        enabledProviderIds = new ArrayList<>();
+        enabledProviders = new ArrayList<>();
+        
+        for (CLIAgentManager.CLIAgent agent : CLIAgentManager.AGENTS) {
+            if (agentManager.isAgentEnabled(agent.id)) {
+                enabledProviderIds.add(agent.id);
+                enabledProviders.add(agent.name);
+            }
+        }
+
+        if (adapter != null) {
+            adapter.clear();
+            adapter.addAll(enabledProviders);
+            adapter.notifyDataSetChanged();
+        } else {
+            adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, enabledProviders);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinnerProvider.setAdapter(adapter);
+        }
+
+        String selectedId = agentManager.getSelectedAgent().id;
+        int index = enabledProviderIds.indexOf(selectedId);
+        
+        if (index != -1) {
+            spinnerProvider.setSelection(index);
+        } else if (!enabledProviderIds.isEmpty()) {
+            spinnerProvider.setSelection(0);
+            agentManager.setSelectedAgent(enabledProviderIds.get(0));
+        }
+    }
+
     @Override
     public void onBindViewHolder(PreferenceViewHolder holder) {
         super.onBindViewHolder(holder);
         holder.itemView.setClickable(false); // Make it focusable but not clickable
 
-        Spinner spinnerProvider = (Spinner) holder.findViewById(R.id.spinner_ai_provider);
-        LinearLayout customContainer = (LinearLayout) holder.findViewById(R.id.custom_command_container);
+        spinnerProvider = (Spinner) holder.findViewById(R.id.spinner_ai_provider);
+        View customContainer = holder.findViewById(R.id.custom_command_container);
         EditText etCustomCommand = (EditText) holder.findViewById(R.id.et_custom_command);
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                getContext(), android.R.layout.simple_spinner_item, providers);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerProvider.setAdapter(adapter);
-
-        // Set initial selection
-        String selectedId = agentManager.getSelectedAgent().id;
-        for (int i = 0; i < providerIds.length; i++) {
-            if (providerIds[i].equals(selectedId)) {
-                spinnerProvider.setSelection(i);
-                if (selectedId.equals("custom")) {
-                    customContainer.setVisibility(View.VISIBLE);
-                } else {
-                    customContainer.setVisibility(View.GONE);
-                }
-                break;
-            }
-        }
+        updateSpinnerAdapter();
 
         etCustomCommand.setText(agentManager.getCustomCommand());
 
-        LinearLayout anthropicContainer = (LinearLayout) holder.findViewById(R.id.anthropic_settings_container);
+        View anthropicContainer = holder.findViewById(R.id.anthropic_settings_container);
         EditText etAnthropicToken = (EditText) holder.findViewById(R.id.et_anthropic_auth_token);
         EditText etAnthropicBaseUrl = (EditText) holder.findViewById(R.id.et_anthropic_base_url);
         EditText etAnthropicModel = (EditText) holder.findViewById(R.id.et_anthropic_model);
@@ -84,14 +90,44 @@ public class AIKeysPreference extends Preference {
         etAnthropicBaseUrl.setText(agentManager.getAnthropicBaseUrl());
         etAnthropicModel.setText(agentManager.getAnthropicModel());
 
+        // Setup visibility toggles
+        LinearLayout agentsToggleContainer = (LinearLayout) holder.findViewById(R.id.agents_toggle_container);
+        if (agentsToggleContainer != null) {
+            agentsToggleContainer.removeAllViews();
+            for (CLIAgentManager.CLIAgent agent : CLIAgentManager.AGENTS) {
+                SwitchCompat switchView = new SwitchCompat(getContext());
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                params.setMargins(0, 8, 0, 8);
+                switchView.setLayoutParams(params);
+                
+                switchView.setText(agent.name);
+                switchView.setTextColor(Color.WHITE);
+                switchView.setShowText(false);
+                switchView.setTextOn("");
+                switchView.setTextOff("");
+                switchView.setChecked(agentManager.isAgentEnabled(agent.id));
+                switchView.setPadding(0, 16, 0, 16);
+                switchView.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                    agentManager.setAgentEnabled(agent.id, isChecked);
+                    updateSpinnerAdapter();
+                });
+                agentsToggleContainer.addView(switchView);
+            }
+        }
+
         spinnerProvider.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String selectedAgentId = providerIds[position];
-                agentManager.setSelectedAgent(selectedAgentId);
-                
-                customContainer.setVisibility(selectedAgentId.equals("custom") ? View.VISIBLE : View.GONE);
-                anthropicContainer.setVisibility(selectedAgentId.equals("claude_code") ? View.VISIBLE : View.GONE);
+                if (position >= 0 && position < enabledProviderIds.size()) {
+                    String selectedAgentId = enabledProviderIds.get(position);
+                    agentManager.setSelectedAgent(selectedAgentId);
+                    
+                    customContainer.setVisibility(selectedAgentId.equals("custom") ? View.VISIBLE : View.GONE);
+                    anthropicContainer.setVisibility(selectedAgentId.equals("claude_code") ? View.VISIBLE : View.GONE);
+                }
             }
 
             @Override
@@ -99,9 +135,9 @@ public class AIKeysPreference extends Preference {
             }
         });
 
-        // Initialize visibility on load
-        customContainer.setVisibility(selectedId.equals("custom") ? View.VISIBLE : View.GONE);
-        anthropicContainer.setVisibility(selectedId.equals("claude_code") ? View.VISIBLE : View.GONE);
+        String currentId = agentManager.getSelectedAgent().id;
+        customContainer.setVisibility(currentId.equals("custom") ? View.VISIBLE : View.GONE);
+        anthropicContainer.setVisibility(currentId.equals("claude_code") ? View.VISIBLE : View.GONE);
 
         etCustomCommand.addTextChangedListener(new TextWatcher() {
             @Override

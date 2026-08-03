@@ -26,11 +26,18 @@ public class AIChatManager {
         if (providerSpinner != null) {
             providerSpinner.setVisibility(View.VISIBLE);
             
-            String[] providers = new String[CLIAgentManager.AGENTS.length];
-            String[] providerIds = new String[CLIAgentManager.AGENTS.length];
-            for (int i = 0; i < CLIAgentManager.AGENTS.length; i++) {
-                providers[i] = CLIAgentManager.AGENTS[i].name;
-                providerIds[i] = CLIAgentManager.AGENTS[i].id;
+            java.util.List<CLIAgentManager.CLIAgent> enabledAgents = new java.util.ArrayList<>();
+            for (CLIAgentManager.CLIAgent agent : CLIAgentManager.AGENTS) {
+                if (cliAgentManager.isAgentEnabled(agent.id)) {
+                    enabledAgents.add(agent);
+                }
+            }
+
+            String[] providers = new String[enabledAgents.size()];
+            String[] providerIds = new String[enabledAgents.size()];
+            for (int i = 0; i < enabledAgents.size(); i++) {
+                providers[i] = enabledAgents.get(i).name;
+                providerIds[i] = enabledAgents.get(i).id;
             }
             
             ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(activity, android.R.layout.simple_spinner_item, providers);
@@ -41,20 +48,30 @@ public class AIChatManager {
             String selectedId = cliAgentManager.getSelectedAgent().id;
             if (activity.getSharedPreferences("cli_agent_prefs", Context.MODE_PRIVATE).getString("selected_agent", null) == null) {
                 selectedId = "custom";
+                if (!cliAgentManager.isAgentEnabled("custom") && !enabledAgents.isEmpty()) {
+                    selectedId = enabledAgents.get(0).id;
+                }
                 cliAgentManager.setSelectedAgent(selectedId);
             }
 
+            boolean foundSelection = false;
             for (int i = 0; i < providerIds.length; i++) {
                 if (providerIds[i].equals(selectedId)) {
                     providerSpinner.setSelection(i);
+                    foundSelection = true;
                     break;
                 }
+            }
+            if (!foundSelection && !enabledAgents.isEmpty()) {
+                providerSpinner.setSelection(0);
+                cliAgentManager.setSelectedAgent(providerIds[0]);
             }
             
             providerSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    CLIAgentManager.CLIAgent agent = CLIAgentManager.AGENTS[position];
+                    if (position < 0 || position >= enabledAgents.size()) return;
+                    CLIAgentManager.CLIAgent agent = enabledAgents.get(position);
                     
                     if (!hasLaunchedInitialAgent) {
                         cliAgentManager.setSelectedAgent(agent.id);

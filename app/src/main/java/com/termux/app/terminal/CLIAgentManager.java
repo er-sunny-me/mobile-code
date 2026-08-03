@@ -58,7 +58,7 @@ public class CLIAgentManager {
             "Claude Code",
             "Anthropic's agentic coding CLI. Writes, edits, and debugs code autonomously.",
             "claude",
-            "if ! command -v claude &> /dev/null; then if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm install -g @anthropic-ai/claude-code; fi",
+            "if ! command -v claude &> /dev/null; then if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @anthropic-ai/claude-code; fi",
             "claude",
             "🟠"
         ),
@@ -67,7 +67,7 @@ public class CLIAgentManager {
             "Antigravity CLI",
             "Google DeepMind's advanced agentic coding assistant.",
             "agy",
-            "if ! command -v agy &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -fsSL https://antigravity.google/cli/install.sh | bash && export PATH=\"/root/.local/bin:$PATH\" && echo 'export PATH=\"/root/.local/bin:$PATH\"' >> ~/.bashrc; fi",
+            "if ! command -v agy &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://antigravity.google/cli/install.sh | bash && export PATH=\"/root/.local/bin:$PATH\" && echo 'export PATH=\"/root/.local/bin:$PATH\"' >> ~/.bashrc; fi",
             "export PATH=\"/root/.local/bin:$PATH\" && agy \"{prompt}\"",
             "🔵"
         ),
@@ -76,7 +76,7 @@ public class CLIAgentManager {
             "Codex CLI",
             "OpenAI's lightweight coding agent for the terminal.",
             "codex",
-            "if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm install -g @openai/codex",
+            "if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @openai/codex",
             "codex \"{prompt}\"",
             "⚪"
         ),
@@ -85,7 +85,7 @@ public class CLIAgentManager {
             "Kiro CLI",
             "Agentic terminal IDE for spec-driven workflows.",
             "kiro",
-            "if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -fsSL https://cli.kiro.dev/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://cli.kiro.dev/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
             "export PATH=\"$HOME/.local/bin:$PATH\" && kiro",
             "🟢"
         ),
@@ -94,7 +94,7 @@ public class CLIAgentManager {
             "Kilo CLI",
             "Multi-model vendor-neutral AI coding assistant.",
             "kilo",
-            "if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm install -g @kilocode/cli; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @kilocode/cli; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
             "export PATH=\"$HOME/.local/bin:$PATH\" && kilo",
             "🟣"
         ),
@@ -103,9 +103,18 @@ public class CLIAgentManager {
             "OpenCode CLI",
             "Extensible Go-based AI coding TUI with plugins.",
             "opencode",
-            "if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -fsSL https://opencode.ai/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://opencode.ai/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
             "export PATH=\"$HOME/.local/bin:$PATH\" && opencode",
             "🟡"
+        ),
+        new CLIAgent(
+            "grok",
+            "Grok CLI",
+            "xAI's Grok coding assistant for the terminal.",
+            "grok",
+            "if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @xai/grok-cli; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "export PATH=\"$HOME/.local/bin:$PATH\" && grok",
+            "⚫"
         ),
         new CLIAgent(
             "custom",
@@ -117,6 +126,15 @@ public class CLIAgentManager {
             "⚙️"
         )
     };
+
+    public boolean isAgentEnabled(String agentId) {
+        // By default, agents are enabled
+        return prefs.getBoolean("agent_enabled_" + agentId, true);
+    }
+
+    public void setAgentEnabled(String agentId, boolean enabled) {
+        prefs.edit().putBoolean("agent_enabled_" + agentId, enabled).apply();
+    }
 
     public CLIAgentManager(Context context) {
         this.context = context;
