@@ -1,94 +1,130 @@
 <div align="center">
-  <img src="https://img.shields.io/badge/MOBILE-CODE-darkred?style=for-the-badge&logo=android" alt="Mobile Code Banner" />
-  <h1>🩸 Mobile Code</h1>
-  <p><strong>A Next-Generation AI-Powered CLI Agent Runner & Terminal for Android</strong></p>
-  
-  [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-red.svg?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0)
-  [![Platform](https://img.shields.io/badge/Platform-Android-darkred.svg?style=flat-square)]()
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=1e1e2e&height=250&section=header&text=ZeroCode%20AI%20Terminal&fontSize=70&fontAlignY=35&desc=Next-Gen%20AI%20Agentic%20Coding%20on%20Android&descAlignY=55&descAlign=50" />
+
+### *Your Pocket Software Development Workstation*
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-FF4B4B.svg?style=for-the-badge&logo=gnu)](https://www.gnu.org/licenses/gpl-3.0)
+[![Platform](https://img.shields.io/badge/Platform-Android-3DDC84.svg?style=for-the-badge&logo=android)]()
+[![Built With Termux](https://img.shields.io/badge/Powered_by-Termux-1E1E2E.svg?style=for-the-badge&logo=gnubash)]()
+
 </div>
 
 ---
 
-## 🌑 Overview
+<br>
 
-**Mobile Code** transforms your Android device into a powerful software development workstation, specifically engineered to run top-tier AI coding agents in your pocket. Built upon the robust foundation of Termux, it seamlessly sets up a full Linux environment and integrates directly with the most powerful CLI-based AI assistants in the world.
+<div align="center">
+  <h2>🌟 What is ZeroCode AI?</h2>
+  <p>
+    <b>ZeroCode</b> (formerly Mobile Code) transforms your Android device into a <strong>powerhouse</strong> for running top-tier AI coding agents. Built on top of the robust <b>Termux</b> ecosystem, it seamlessly bridges the gap between mobile environments and advanced autonomous coding assistants.
+  </p>
+  <p>
+    Whether you're fixing production bugs from a coffee shop, architecting full apps on a flight, or exploring agentic AI, ZeroCode puts the world's most capable AI in your pocket.
+  </p>
+</div>
 
-Whether you're fixing bugs on the go, architecting full applications, or generating scripts, Mobile Code acts as the ultimate bridge between your phone and agentic AI.
+<br>
 
-## 🔴 Elite Features
+## 🚀 Elite Capabilities
 
-- 🤖 **Native CLI Agent Launcher**: Run world-class AI agents directly in the terminal via a sleek dropdown menu. Out-of-the-box support for:
-  - **Claude Code** (Anthropic's autonomous coding CLI)
-  - **Antigravity CLI** (DeepMind's advanced agent)
-  - **Grok CLI** (xAI's coding assistant for the terminal)
-  - **Codex** (OpenAI's lightweight agent)
-  - **Kiro**, **Kilo**, and **OpenCode** CLIs
-- ⚡ **Auto-Bootstrapping**: No complex setup required. The app automatically downloads and installs Node.js, Python, npm, and the required CLI tools for your chosen agent the first time you select it.
-- 🐧 **Full Linux Environment**: A complete Ubuntu-based PRoot Linux environment running on your phone, offering full access to `apt`, `npm`, `pip`, and standard Linux development tools.
-- 🔄 **Smart Session Management**: Seamlessly switch between different AI agents. The app handles background processes safely, ensuring clean terminal sessions without lingering locks or corrupted caches.
-- 🎨 **Aggressive Dark Mode Aesthetic**: Designed for OLED screens with a premium, focused dark theme, Material 3 UI, and custom toggle switches.
+<table>
+  <tr>
+    <td width="50%">
+      <h3>🤖 Native CLI Agent Support</h3>
+      <p>Run world-class AI agents directly in the terminal via a sleek native dropdown. Seamlessly switch between:</p>
+      <ul>
+        <li><b>Claude Code</b> (Anthropic's autonomous CLI)</li>
+        <li><b>Grok CLI</b> (xAI's coding assistant)</li>
+        <li><b>OpenCode</b> & <b>Kiro</b> (Extensible Go-based CLIs)</li>
+        <li><b>Antigravity</b> (DeepMind's advanced agent)</li>
+      </ul>
+    </td>
+    <td width="50%">
+      <h3>⚡ Zero-Friction Setup</h3>
+      <p>No more complex dependency nightmares. The app features <b>Auto-Bootstrapping</b>—it automatically downloads and configures Node.js, Python, npm, and required CLI tools the moment you select an agent.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>🐧 Unrestricted Linux Core</h3>
+      <p>A complete Ubuntu-based PRoot Linux environment running locally on your phone. Get full root-like access to <code>apt</code>, <code>npm</code>, <code>pip</code>, and standard development toolchains.</p>
+    </td>
+    <td width="50%">
+      <h3>📸 Smart Multimodal Support</h3>
+      <p><b>[NEW]</b> Click the Gallery icon 📎 in the terminal top bar to effortlessly insert images straight into your AI agent's prompt. Fix UI bugs by simply showing the agent what's wrong!</p>
+    </td>
+  </tr>
+</table>
 
-## 🚀 Getting Started
+<br>
 
-### Installation
+## 🎨 Aggressive Dark Mode Aesthetic
+Designed for modern OLED screens, ZeroCode features a highly customized, distraction-free **Material Dark** UI. 
+- Deep blacks (`#1E1E2E`)
+- Custom Agent Switcher Spinners
+- Floating Action Keys for Coding
+
+---
+
+## 📥 Getting Started
+
+### 1. Download & Install
 
 <div align="center">
   <a href="https://github.com/er-sunny-me/mobile-code/releases/latest/download/app-debug.apk">
-    <img src="https://img.shields.io/badge/Download-app--debug.apk-blue?style=for-the-badge&logo=android" alt="Download Debug APK" />
+    <img src="https://img.shields.io/badge/Download_Debug_APK-0052CC?style=for-the-badge&logo=android&logoColor=white" alt="Download Debug" />
   </a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://github.com/er-sunny-me/mobile-code/releases/latest/download/app-release.apk">
-    <img src="https://img.shields.io/badge/Download-app--release.apk-brightgreen?style=for-the-badge&logo=android" alt="Download Release APK" />
+    <img src="https://img.shields.io/badge/Download_Release_APK-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Download Release" />
   </a>
 </div>
 
-1. Click on one of the badges above to download the APK.
-2. Install the APK on your Android device (ensure "Install from Unknown Sources" is enabled).
-3. Launch the app. Allow the necessary storage permissions so the AI agents can read and write code to your phone's storage.
+> **Note:** Ensure "Install from Unknown Sources" is enabled on your Android device.
 
-### Using AI Agents
+### 2. First Run Setup
+1. Launch the app and grant **Storage Permissions** so agents can read/write your project files.
+2. Tap the **Agent Dropdown** at the top.
+3. Select your preferred AI (e.g., **Claude Code**).
+4. Watch the magic happen as it auto-installs dependencies. Authenticate when prompted, and start coding!
 
-1. At the top of the screen, tap the **Agent Dropdown Menu**.
-2. Select your preferred AI (e.g., **Claude Code**).
-3. If it's your first time, the terminal will automatically install the necessary dependencies (`nodejs`, `npm`, and the agent itself).
-4. Follow the on-screen terminal prompts to authenticate the agent (e.g., via browser login).
-5. Start coding!
+---
 
-## 🛠️ Build from Source
+## 🛠️ Build From Source
 
-To build Mobile Code yourself, clone this repository and build it using Gradle:
+Want to hack on the app itself? It's easy:
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/er-sunny-me/mobile-code.git
 
-# Navigate into the directory
+# 2. Enter the directory
 cd mobile-code
 
-# Build the debug APK
+# 3. Build the debug APK using Gradle
 ./gradlew assembleDebug
 ```
+*Your freshly compiled APK will be waiting in `app/build/outputs/apk/debug/`.*
 
-> **Note:** The resulting APK will be available in `app/build/outputs/apk/debug/`.
+---
 
 ## 🤝 Contributing
 
-We love open-source and welcome contributions! Whether it's adding support for a new CLI agent, tweaking the UI, or fixing a bug, your help is appreciated.
+We are building the future of mobile software engineering, and we'd love your help! 
+Whether you're adding support for a new AI CLI tool, optimizing terminal performance, or refining the UI:
 
-**How to contribute:**
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/NewAgent`)
-3. Commit your changes (`git commit -m 'Add support for new CLI Agent'`)
-4. Push to the branch (`git push origin feature/NewAgent`)
-5. Open a Pull Request on GitHub
-
-## 📄 License
-
-Mobile Code is open-source software licensed under the **GPLv3 License**. 
-It is a derivative work based on the incredible [Termux](https://github.com/termux/termux-app) ecosystem.
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/EpicAgent`)
+3. **Commit** your changes (`git commit -m 'Add support for EpicAgent'`)
+4. **Push** to the branch (`git push origin feature/EpicAgent`)
+5. **Open** a Pull Request ✨
 
 ---
+
 <div align="center">
-  <b>Developed by Er Sunny & Contributors</b><br>
-  <i>Forging the future of mobile coding.</i>
+  <h3>License</h3>
+  <p>ZeroCode is open-source software licensed under the <b>GPLv3 License</b>. <br>Built on the shoulders of giants: <a href="https://github.com/termux/termux-app">Termux</a>.</p>
+  
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=1e1e2e&height=100&section=footer" />
 </div>
