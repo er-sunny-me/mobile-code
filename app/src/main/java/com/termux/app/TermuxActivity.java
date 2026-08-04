@@ -260,16 +260,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         setTerminalToolbarView(savedInstanceState);
 
-        setSettingsButtonView();
-        
         // Initialize AI Chat UI Manager
         mAiChatManager = new com.termux.app.terminal.AIChatManager(this);
         
         checkAiPermissionSetup();
-        
-        setAskAiButtonView();
-
-        setNewSessionButtonView();
 
         setToggleKeyboardView();
         setPickImageButtonView();
@@ -640,16 +634,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
 
 
-    private void setSettingsButtonView() {
-        // Removed in redesign
-        // ImageButton settingsButton = findViewById(R.id.settings_button);
-        // settingsButton.setOnClickListener(v -> { ... });
-    }
 
-    private void setNewSessionButtonView() {
-        // Removed in redesign
-        // View newSessionButton = findViewById(R.id.new_session_button);
-    }
 
     private void setToggleKeyboardView() {
         View btnToggleKeyboard = findViewById(R.id.btn_toggle_keyboard);
@@ -671,9 +656,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
     }
 
-    private void setAskAiButtonView() {
-        // Removed in redesign
-    }
+
 
     private void checkAiPermissionSetup() {
         android.content.SharedPreferences aiPrefs = getSharedPreferences("ai_settings", Context.MODE_PRIVATE);
