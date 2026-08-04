@@ -260,6 +260,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         setTerminalToolbarView(savedInstanceState);
 
+        // Check for updates
+        com.termux.app.utils.UpdateChecker.checkForUpdates(this);
+
         // Initialize AI Chat UI Manager
         mAiChatManager = new com.termux.app.terminal.AIChatManager(this);
         

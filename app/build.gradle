@@ -54,7 +54,7 @@ android {
         multiDexEnabled true
         applicationId "com.termux"
         versionCode 130
-        versionName "1.3.0"
+        versionName "0.0.2"
 
         if (appVersionName) versionName = appVersionName
         validateVersionName(versionName)
