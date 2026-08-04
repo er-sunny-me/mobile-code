@@ -938,8 +938,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             } catch (Exception e) {
                 Logger.logError(LOG_TAG, "Failed to copy image: " + e.getMessage());
             }
-        }
-    }
         if (requestCode == PermissionUtils.REQUEST_GRANT_STORAGE_PERMISSION) {
             requestStoragePermission(true);
         }
