@@ -40,8 +40,8 @@ public class AIChatManager {
                 providerIds[i] = enabledAgents.get(i).id;
             }
             
-            ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(activity, android.R.layout.simple_spinner_item, providers);
-            spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(activity, R.layout.spinner_item_white, providers);
+            spinAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_white);
             providerSpinner.setAdapter(spinAdapter);
             
             // Set default to Custom Agent if no agent is explicitly saved

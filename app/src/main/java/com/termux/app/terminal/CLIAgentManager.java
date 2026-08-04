@@ -76,7 +76,7 @@ public class CLIAgentManager {
             "Codex CLI",
             "OpenAI's lightweight coding agent for the terminal.",
             "codex",
-            "if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @openai/codex",
+            "if ! command -v codex &> /dev/null; then if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @openai/codex; fi",
             "codex \"{prompt}\"",
             "⚪"
         ),
@@ -85,7 +85,7 @@ public class CLIAgentManager {
             "Kiro CLI",
             "Agentic terminal IDE for spec-driven workflows.",
             "kiro",
-            "if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://cli.kiro.dev/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "if ! command -v kiro &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://cli.kiro.dev/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"; fi",
             "export PATH=\"$HOME/.local/bin:$PATH\" && kiro",
             "🟢"
         ),
@@ -94,7 +94,7 @@ public class CLIAgentManager {
             "Kilo CLI",
             "Multi-model vendor-neutral AI coding assistant.",
             "kilo",
-            "if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @kilocode/cli; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "if ! command -v kilo &> /dev/null; then if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @kilocode/cli; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"; fi",
             "export PATH=\"$HOME/.local/bin:$PATH\" && kilo",
             "🟣"
         ),
@@ -103,7 +103,7 @@ public class CLIAgentManager {
             "OpenCode CLI",
             "Extensible Go-based AI coding TUI with plugins.",
             "opencode",
-            "if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://opencode.ai/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "if ! command -v opencode &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://opencode.ai/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"; fi",
             "export PATH=\"$HOME/.local/bin:$PATH\" && opencode",
             "🟡"
         ),
@@ -112,7 +112,7 @@ public class CLIAgentManager {
             "Grok CLI",
             "xAI's Grok coding assistant for the terminal.",
             "grok",
-            "if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @xai/grok-cli; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"",
+            "if ! command -v grok &> /dev/null; then if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @xai/grok-cli; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"; fi",
             "export PATH=\"$HOME/.local/bin:$PATH\" && grok",
             "⚫"
         ),

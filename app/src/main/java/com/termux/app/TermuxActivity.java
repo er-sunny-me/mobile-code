@@ -640,8 +640,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setToggleKeyboardView() {
-        // Removed in redesign
-        // findViewById(R.id.toggle_keyboard_button)
+        View btnToggleKeyboard = findViewById(R.id.btn_toggle_keyboard);
+        if (btnToggleKeyboard != null) {
+            btnToggleKeyboard.setOnClickListener(v -> {
+                com.termux.shared.view.KeyboardUtils.toggleSoftKeyboard(this);
+            });
+        }
     }
 
     private void setAskAiButtonView() {
