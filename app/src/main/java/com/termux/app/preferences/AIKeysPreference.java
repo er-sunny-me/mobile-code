@@ -95,13 +95,20 @@ public class AIKeysPreference extends Preference {
         if (agentsToggleContainer != null) {
             agentsToggleContainer.removeAllViews();
             for (CLIAgentManager.CLIAgent agent : CLIAgentManager.AGENTS) {
-                SwitchCompat switchView = new SwitchCompat(getContext());
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout row = new LinearLayout(getContext());
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                params.setMargins(0, 8, 0, 8);
-                switchView.setLayoutParams(params);
+                rowParams.setMargins(0, 8, 0, 8);
+                row.setLayoutParams(rowParams);
+
+                SwitchCompat switchView = new SwitchCompat(getContext());
+                LinearLayout.LayoutParams switchParams = new LinearLayout.LayoutParams(
+                        0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f
+                );
+                switchView.setLayoutParams(switchParams);
                 
                 switchView.setText(agent.name);
                 switchView.setTextColor(Color.WHITE);
@@ -114,7 +121,31 @@ public class AIKeysPreference extends Preference {
                     agentManager.setAgentEnabled(agent.id, isChecked);
                     updateSpinnerAdapter();
                 });
-                agentsToggleContainer.addView(switchView);
+                
+                row.addView(switchView);
+
+                if (agent.installCommand != null && !agent.installCommand.isEmpty()) {
+                    android.widget.Button btnDownload = new android.widget.Button(getContext());
+                    btnDownload.setText("Download");
+                    btnDownload.setTextColor(Color.WHITE);
+                    btnDownload.setTextSize(12f);
+                    
+                    LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                    );
+                    btnDownload.setLayoutParams(btnParams);
+                    btnDownload.setOnClickListener(v -> {
+                        android.content.Intent intent = new android.content.Intent(getContext(), com.termux.app.TermuxActivity.class);
+                        intent.setAction("com.termux.app.INSTALL_AGENT");
+                        intent.putExtra("agent_id", agent.id);
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                        getContext().startActivity(intent);
+                    });
+                    row.addView(btnDownload);
+                }
+
+                agentsToggleContainer.addView(row);
             }
         }
 

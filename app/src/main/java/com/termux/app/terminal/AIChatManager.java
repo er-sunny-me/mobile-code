@@ -103,13 +103,30 @@ public class AIChatManager {
                     if (isInitial) {
                         currentSession.write("clear && " + cmd + "\r\n");
                     } else {
-                        // Send Ctrl+C to kill running foreground process
-                        currentSession.write("\003");
-                        // Send Ctrl+U to clear any typed text
-                        currentSession.write("\025");
-                        handler.postDelayed(() -> {
-                            currentSession.write("clear && " + cmd + "\r\n");
-                        }, 500);
+                        // Create a NEW session for the new agent
+                        activity.getTermuxTerminalSessionClient().addNewSession(false, agent.name);
+                        
+                        // Wait for the new session to become active
+                        handler.postDelayed(new Runnable() {
+                            int checkRetries = 0;
+                            @Override
+                            public void run() {
+                                TerminalSession newSession = activity.getCurrentSession();
+                                if (newSession != null && newSession != currentSession) {
+                                    // Kill the old session completely
+                                    currentSession.finishIfRunning();
+                                    // Run command in new session
+                                    newSession.write("clear && " + cmd + "\r\n");
+                                } else if (checkRetries < 20) {
+                                    checkRetries++;
+                                    handler.postDelayed(this, 100);
+                                } else {
+                                    // Fallback: just try to kill current foreground and run
+                                    currentSession.write("\003\004");
+                                    currentSession.write("clear && " + cmd + "\r\n");
+                                }
+                            }
+                        }, 100);
                     }
                 } else if (retries < 20) {
                     // Wait up to 2 seconds for terminal session to be created
@@ -118,5 +135,18 @@ public class AIChatManager {
                 }
             }
         });
+    }
+    public void installAgent(String agentId) {
+        for (CLIAgentManager.CLIAgent agent : CLIAgentManager.AGENTS) {
+            if (agent.id.equals(agentId) && agent.installCommand != null && !agent.installCommand.isEmpty()) {
+                TerminalSession currentSession = activity.getCurrentSession();
+                if (currentSession != null) {
+                    currentSession.write("\003"); // Kill running process
+                    currentSession.write("\025"); // Clear input
+                    currentSession.write("clear && " + agent.installCommand + "\r\n");
+                }
+                break;
+            }
+        }
     }
 }

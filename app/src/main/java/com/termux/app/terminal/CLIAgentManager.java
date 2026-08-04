@@ -214,10 +214,6 @@ public class CLIAgentManager {
             }
         }
 
-        if (agent.installCommand != null && !agent.installCommand.isEmpty()) {
-            return "cd " + shellEscape(workspace) + " && " + agent.installCommand + " && " + cmd;
-        }
-
         return "cd " + shellEscape(workspace) + " && " + cmd;
     }
 
