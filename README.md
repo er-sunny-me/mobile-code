@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=1e1e2e&height=250&section=header&text=ZeroCode%20AI%20Terminal&fontSize=70&fontAlignY=35&desc=Next-Gen%20AI%20Agentic%20Coding%20on%20Android&descAlignY=55&descAlign=50" />
+<img src="https://capsule-render.vercel.app/api?type=waving&color=1e1e2e&height=250&section=header&text=Mobile%20Code&fontSize=80&fontAlignY=35&desc=Next-Gen%20AI%20Agentic%20Coding%20on%20Android&descAlignY=55&descAlign=50" />
 
 ### *Your Pocket Software Development Workstation*
 
@@ -15,12 +15,12 @@
 <br>
 
 <div align="center">
-  <h2>🌟 What is ZeroCode AI?</h2>
+  <h2>🌟 What is Mobile Code?</h2>
   <p>
-    <b>ZeroCode</b> (formerly Mobile Code) transforms your Android device into a <strong>powerhouse</strong> for running top-tier AI coding agents. Built on top of the robust <b>Termux</b> ecosystem, it seamlessly bridges the gap between mobile environments and advanced autonomous coding assistants.
+    <b>Mobile Code</b> transforms your Android device into a <strong>powerhouse</strong> for running top-tier AI coding agents. Built on top of the robust <b>Termux</b> ecosystem, it seamlessly bridges the gap between mobile environments and advanced autonomous coding assistants.
   </p>
   <p>
-    Whether you're fixing production bugs from a coffee shop, architecting full apps on a flight, or exploring agentic AI, ZeroCode puts the world's most capable AI in your pocket.
+    Whether you're fixing production bugs from a coffee shop, architecting full apps on a flight, or exploring agentic AI, Mobile Code puts the world's most capable AI in your pocket.
   </p>
 </div>
 
@@ -60,7 +60,7 @@
 <br>
 
 ## 🎨 Aggressive Dark Mode Aesthetic
-Designed for modern OLED screens, ZeroCode features a highly customized, distraction-free **Material Dark** UI. 
+Designed for modern OLED screens, Mobile Code features a highly customized, distraction-free **Material Dark** UI. 
 - Deep blacks (`#1E1E2E`)
 - Custom Agent Switcher Spinners
 - Floating Action Keys for Coding
@@ -124,7 +124,7 @@ Whether you're adding support for a new AI CLI tool, optimizing terminal perform
 
 <div align="center">
   <h3>License</h3>
-  <p>ZeroCode is open-source software licensed under the <b>GPLv3 License</b>. <br>Built on the shoulders of giants: <a href="https://github.com/termux/termux-app">Termux</a>.</p>
+  <p>Mobile Code is open-source software licensed under the <b>GPLv3 License</b>. <br>Built on the shoulders of giants: <a href="https://github.com/termux/termux-app">Termux</a>.</p>
   
   <img src="https://capsule-render.vercel.app/api?type=waving&color=1e1e2e&height=100&section=footer" />
 </div>
