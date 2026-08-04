@@ -108,6 +108,15 @@ public class CLIAgentManager {
             "🟡"
         ),
         new CLIAgent(
+            "grok",
+            "Grok CLI",
+            "xAI's Grok coding assistant for the terminal.",
+            "grok",
+            "if ! command -v grok &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -fsSL https://x.ai/cli/install.sh | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"; fi",
+            "export PATH=\"$HOME/.local/bin:$PATH\" && grok",
+            "⚫"
+        ),
+        new CLIAgent(
             "custom",
             "Custom Agent",
             "Run any CLI agent command you want. Full control.",
