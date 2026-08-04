@@ -55,6 +55,12 @@
     <!-- app:layout="@layout/preference_markdown_text" -->
 
     <Preference
+        app:key="check_update"
+        app:title="Check for Updates"
+        app:summary="Check if a new version is available"
+        app:persistent="false"/>
+
+    <Preference
         app:key="donate"
         app:title="@string/donate_preference_title"
         app:persistent="false"

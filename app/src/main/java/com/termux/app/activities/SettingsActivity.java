@@ -75,8 +75,24 @@ public class SettingsActivity extends AppCompatActivity {
                     configureSyncWorkshopPreference(context);
                     configureAboutPreference(context);
                     configureDonatePreference(context);
+                    configureUpdateCheckPreference(context);
                 }
             }.start();
+        }
+
+        private void configureUpdateCheckPreference(@NonNull Context context) {
+            Preference updatePreference = findPreference("check_update");
+            if (updatePreference != null) {
+                updatePreference.setOnPreferenceClickListener(preference -> {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            android.widget.Toast.makeText(context, "Checking for updates...", android.widget.Toast.LENGTH_SHORT).show();
+                            com.termux.app.utils.UpdateChecker.checkForUpdates(context);
+                        });
+                    }
+                    return true;
+                });
+            }
         }
 
         private void configureTermuxAPIPreference(@NonNull Context context) {
