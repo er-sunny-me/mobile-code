@@ -62,6 +62,15 @@
                 android:layout_height="0dp"
                 android:layout_weight="1" />
 
+            <!-- Pick Image Button -->
+            <ImageButton
+                android:id="@+id/btn_pick_image"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_gallery"
+                app:tint="@color/zc_text_white" />
+
             <!-- Keyboard Toggle Button -->
             <Button
                 android:id="@+id/btn_toggle_keyboard"

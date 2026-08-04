@@ -82,6 +82,9 @@ import java.util.Arrays;
  */
 public final class TermuxActivity extends AppCompatActivity implements ServiceConnection {
 
+    /** Request code for picking image */
+    private static final int REQUEST_CODE_PICK_IMAGE = 1001;
+
     /**
      * The connection to the {@link TermuxService}. Requested in {@link #onCreate(Bundle)} with a call to
      * {@link #bindService(Intent, ServiceConnection, int)}, and obtained and stored in
@@ -269,6 +272,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setNewSessionButtonView();
 
         setToggleKeyboardView();
+        setPickImageButtonView();
 
         // ZeroCode Studio: Close Terminal Button
         View btnCloseTerminal = findViewById(R.id.btn_close_terminal);
@@ -656,6 +660,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
     }
 
+    private void setPickImageButtonView() {
+        View btnPickImage = findViewById(R.id.btn_pick_image);
+        if (btnPickImage != null) {
+            btnPickImage.setOnClickListener(v -> {
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.setType("image/*");
+                startActivityForResult(intent, REQUEST_CODE_PICK_IMAGE);
+            });
+        }
+    }
+
     private void setAskAiButtonView() {
         // Removed in redesign
     }
@@ -892,6 +907,39 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         Logger.logVerbose(LOG_TAG, "onActivityResult: requestCode: " + requestCode + ", resultCode: "  + resultCode + ", data: "  + IntentUtils.getIntentString(data));
+        
+        if (requestCode == REQUEST_CODE_PICK_IMAGE && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            android.net.Uri uri = data.getData();
+            try {
+                java.io.InputStream in = getContentResolver().openInputStream(uri);
+                if (in != null) {
+                    String fileName = "image_" + System.currentTimeMillis() + ".jpg";
+                    String workspace = getSharedPreferences("ZeroCodePrefs", Context.MODE_PRIVATE)
+                            .getString("workspace_path", "/data/data/com.termux/files/home");
+                    java.io.File destFile = new java.io.File(workspace, fileName);
+                    java.io.FileOutputStream out = new java.io.FileOutputStream(destFile);
+                    byte[] buffer = new byte[4096];
+                    int read;
+                    while ((read = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, read);
+                    }
+                    in.close();
+                    out.flush();
+                    out.close();
+                    
+                    if (getCurrentSession() != null) {
+                        String path = destFile.getAbsolutePath();
+                        if (path.contains(" ")) {
+                            path = "'" + path + "'";
+                        }
+                        getCurrentSession().write(" " + path + " ");
+                    }
+                }
+            } catch (Exception e) {
+                Logger.logError(LOG_TAG, "Failed to copy image: " + e.getMessage());
+            }
+        }
+    }
         if (requestCode == PermissionUtils.REQUEST_GRANT_STORAGE_PERMISSION) {
             requestStoragePermission(true);
         }
