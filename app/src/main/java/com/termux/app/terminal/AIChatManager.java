@@ -103,22 +103,12 @@ public class AIChatManager {
                     if (isInitial) {
                         currentSession.write("clear && " + cmd + "\r\n");
                     } else {
-                        // Create a NEW session for the new agent
-                        activity.getTermuxTerminalSessionClient().addNewSession(false, agent.name);
-                        
-                        // Wait for the new session to become active
+                        // Send Ctrl+C to kill running foreground process
+                        currentSession.write("\003");
+                        // Send Ctrl+U to clear any typed text
+                        currentSession.write("\025");
                         handler.postDelayed(() -> {
-                            TerminalSession newSession = activity.getCurrentSession();
-                            if (newSession != null && newSession != currentSession) {
-                                // Kill the old session
-                                currentSession.finishIfRunning();
-                                // Run command in new session
-                                newSession.write("clear && " + cmd + "\r\n");
-                            } else {
-                                // Fallback just in case
-                                currentSession.write("\003");
-                                currentSession.write("clear && " + cmd + "\r\n");
-                            }
+                            currentSession.write("clear && " + cmd + "\r\n");
                         }, 500);
                     }
                 } else if (retries < 20) {
