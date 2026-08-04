@@ -108,15 +108,6 @@ public class CLIAgentManager {
             "🟡"
         ),
         new CLIAgent(
-            "grok",
-            "Grok CLI",
-            "xAI's Grok coding assistant for the terminal.",
-            "grok",
-            "echo \"Grok CLI is not publicly available on NPM.\"",
-            "echo \"Grok CLI not installed\"",
-            "⚫"
-        ),
-        new CLIAgent(
             "custom",
             "Custom Agent",
             "Run any CLI agent command you want. Full control.",

@@ -114,7 +114,15 @@ public class AIChatManager {
                                 TerminalSession newSession = activity.getCurrentSession();
                                 if (newSession != null && newSession != currentSession) {
                                     // Kill the old session completely
+                                    int pid = currentSession.getPid();
                                     currentSession.finishIfRunning();
+                                    if (pid > 0) {
+                                        try {
+                                            Runtime.getRuntime().exec("kill -9 " + pid);
+                                        } catch (Exception e) {}
+                                    }
+                                    activity.getTermuxTerminalSessionClient().removeFinishedSession(currentSession);
+                                    
                                     // Run command in new session
                                     newSession.write("clear && " + cmd + "\r\n");
                                 } else if (checkRetries < 20) {
@@ -139,12 +147,14 @@ public class AIChatManager {
     public void installAgent(String agentId) {
         for (CLIAgentManager.CLIAgent agent : CLIAgentManager.AGENTS) {
             if (agent.id.equals(agentId) && agent.installCommand != null && !agent.installCommand.isEmpty()) {
-                TerminalSession currentSession = activity.getCurrentSession();
-                if (currentSession != null) {
-                    currentSession.write("\003"); // Kill running process
-                    currentSession.write("\025"); // Clear input
-                    currentSession.write("clear && " + agent.installCommand + "\r\n");
-                }
+                activity.getTermuxTerminalSessionClient().addNewSession(false, "Install " + agent.name);
+                Handler handler = new Handler(Looper.getMainLooper());
+                handler.postDelayed(() -> {
+                    TerminalSession newSession = activity.getCurrentSession();
+                    if (newSession != null) {
+                        newSession.write("clear && " + agent.installCommand + " && exit\r\n");
+                    }
+                }, 500);
                 break;
             }
         }

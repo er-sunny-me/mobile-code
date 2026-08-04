@@ -124,7 +124,7 @@ public class AIKeysPreference extends Preference {
                 
                 row.addView(switchView);
 
-                if (agent.installCommand != null && !agent.installCommand.isEmpty()) {
+                if (agent.installCommand != null && !agent.installCommand.isEmpty() && !agentManager.isAgentInstalled(agent)) {
                     android.widget.Button btnDownload = new android.widget.Button(getContext());
                     btnDownload.setText("Download");
                     btnDownload.setTextColor(Color.WHITE);
