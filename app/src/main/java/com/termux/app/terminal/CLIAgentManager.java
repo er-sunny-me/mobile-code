@@ -85,7 +85,7 @@ public class CLIAgentManager {
             "Kiro CLI",
             "Agentic terminal IDE for spec-driven workflows.",
             "kiro",
-            "if ! command -v kiro-cli &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://cli.kiro.dev/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"; fi",
+            "if ! command -v kiro-cli &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://cli.kiro.dev/install | bash; fi",
             "export PATH=\"$HOME/.local/bin:$PATH\" && kiro-cli",
             "🟢"
         ),
@@ -94,7 +94,7 @@ public class CLIAgentManager {
             "Kilo CLI",
             "Multi-model vendor-neutral AI coding assistant.",
             "kilo",
-            "if ! command -v kilo &> /dev/null; then if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @kilocode/cli; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"; fi",
+            "if ! command -v kilo &> /dev/null; then if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @kilocode/cli; fi",
             "export PATH=\"$HOME/.local/bin:$PATH\" && kilo",
             "🟣"
         ),
@@ -103,7 +103,7 @@ public class CLIAgentManager {
             "OpenCode CLI",
             "Extensible Go-based AI coding TUI with plugins.",
             "opencode",
-            "if ! command -v opencode &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://opencode.ai/install | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"; fi",
+            "if ! command -v opencode &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://opencode.ai/install | bash; fi",
             "export PATH=\"$HOME/.local/bin:$PATH\" && opencode",
             "🟡"
         ),
@@ -112,7 +112,7 @@ public class CLIAgentManager {
             "Grok CLI",
             "xAI's Grok coding assistant for the terminal.",
             "grok",
-            "if ! command -v grok &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -fsSL https://x.ai/cli/install.sh | bash; mkdir -p ~/.local/bin; echo '#!/bin/bash' > ~/.local/bin/xdg-open; echo 'am start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' >> ~/.local/bin/xdg-open; chmod +x ~/.local/bin/xdg-open; export PATH=\"$HOME/.local/bin:$PATH\"; fi",
+            "if ! command -v grok &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -fsSL https://x.ai/cli/install.sh | bash; fi",
             "export PATH=\"$HOME/.local/bin:$PATH\" && grok",
             "⚫"
         ),
@@ -122,7 +122,7 @@ public class CLIAgentManager {
             "GitHub's AI coding assistant for the terminal.",
             "copilot",
             "if ! command -v copilot &> /dev/null; then echo 'Installing GitHub Copilot...'; if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y curl ca-certificates && curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @github/copilot || { echo 'Installation failed. Press enter to exit.'; read; }; fi",
-            "mkdir -p ~/.local/bin && echo -e '#!/bin/bash\\nam start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' > ~/.local/bin/xdg-open && chmod +x ~/.local/bin/xdg-open && export PATH=\"$HOME/.local/bin:$PATH\" && export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt && export NODE_TLS_REJECT_UNAUTHORIZED=0 && npx -y @github/copilot -p \"{prompt}\"",
+            "npx -y @github/copilot -p \"{prompt}\"",
             "🐙"
         ),
         new CLIAgent(
@@ -200,6 +200,13 @@ public class CLIAgentManager {
         String cmd = agent.runCommandTemplate
                 .replace("{prompt}", prompt.replace("\"", "\\\""))
                 .replace("{workspace}", workspace);
+
+        // Inject global Android environment fixes for ALL agents
+        // 1. Sets up xdg-open to use termux-open-url (so CLI agents can open the Android browser)
+        // 2. Exports Termux's native CA certificates so Rust/Go/Node CLIs don't fail with SSL UnknownIssuer
+        String globalSetup = "mkdir -p ~/.local/bin && echo -e '#!/bin/bash\\n/data/data/com.termux/files/usr/bin/termux-open-url \"$1\" >/dev/null 2>&1' > ~/.local/bin/xdg-open && chmod +x ~/.local/bin/xdg-open && export PATH=\"$HOME/.local/bin:$PATH\" && export SSL_CERT_FILE=/data/data/com.termux/files/usr/etc/tls/cert.pem && export NODE_TLS_REJECT_UNAUTHORIZED=0 && ";
+        
+        cmd = globalSetup + cmd;
 
         // Prepend Anthropic vars if Claude Code is selected
         if (agent.id.equals("claude_code")) {

@@ -273,6 +273,20 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (btnCloseTerminal != null) {
             btnCloseTerminal.setOnClickListener(v -> finish());
         }
+        
+        // ZeroCode Studio: Full Screen Terminal Button
+        View btnFullscreenTerminal = findViewById(R.id.btn_fullscreen_terminal);
+        if (btnFullscreenTerminal != null) {
+            btnFullscreenTerminal.setOnClickListener(v -> {
+                if (dimOverlay != null) {
+                    if (dimOverlay.getVisibility() == View.VISIBLE) {
+                        dimOverlay.setVisibility(View.GONE);
+                    } else {
+                        dimOverlay.setVisibility(View.VISIBLE);
+                    }
+                }
+            });
+        }
 
         registerForContextMenu(mTerminalView);
 
