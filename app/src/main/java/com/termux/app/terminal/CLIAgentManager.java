@@ -117,6 +117,15 @@ public class CLIAgentManager {
             "⚫"
         ),
         new CLIAgent(
+            "github_copilot",
+            "GitHub Copilot CLI",
+            "GitHub's AI coding assistant for the terminal.",
+            "copilot",
+            "if ! command -v copilot &> /dev/null; then echo 'Installing GitHub Copilot...'; if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y curl ca-certificates && curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs || pkg install -y nodejs; fi; npm config set strict-ssl false; npm install -g @github/copilot || { echo 'Installation failed. Press enter to exit.'; read; }; fi",
+            "mkdir -p ~/.local/bin && echo -e '#!/bin/bash\\nam start -a android.intent.action.VIEW -d \"$1\" >/dev/null 2>&1' > ~/.local/bin/xdg-open && chmod +x ~/.local/bin/xdg-open && export PATH=\"$HOME/.local/bin:$PATH\" && export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt && export NODE_TLS_REJECT_UNAUTHORIZED=0 && npx -y @github/copilot -p \"{prompt}\"",
+            "🐙"
+        ),
+        new CLIAgent(
             "custom",
             "Custom Agent",
             "Run any CLI agent command you want. Full control.",
