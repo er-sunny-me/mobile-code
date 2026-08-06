@@ -1,6 +1,6 @@
      .global blob
      .global blob_size
-     .section .rodata
+     .section .rodata, "a"
  blob:
  #if defined __i686__
      .incbin "bootstrap-i686.zip"
