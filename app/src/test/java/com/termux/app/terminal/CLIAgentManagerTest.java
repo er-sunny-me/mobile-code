@@ -332,4 +332,44 @@ public class CLIAgentManagerTest {
         assertFalse(CLIAgentManager.needsLogin(CLIAgentManager.findAgent("custom")));
         assertFalse(CLIAgentManager.needsLogin(null));
     }
+
+    @Test
+    public void availableModelsOnlyIncludeValidVendorModels() {
+        // Antigravity (Google DeepMind) must only have Gemini models
+        java.util.List<String> agyModels = CLIAgentManager.getAvailableModels("antigravity");
+        assertFalse("Antigravity models list must not be empty", agyModels.isEmpty());
+        for (String m : agyModels) {
+            assertTrue("Antigravity model must be Gemini: " + m, m.startsWith("gemini-"));
+        }
+
+        // Claude Code must only have Claude models
+        java.util.List<String> claudeModels = CLIAgentManager.getAvailableModels("claude_code");
+        assertFalse("Claude models list must not be empty", claudeModels.isEmpty());
+        for (String m : claudeModels) {
+            assertTrue("Claude model must be Claude: " + m, m.startsWith("claude-"));
+        }
+
+        // Codex must only have OpenAI models
+        java.util.List<String> codexModels = CLIAgentManager.getAvailableModels("codex");
+        assertFalse("Codex models list must not be empty", codexModels.isEmpty());
+        for (String m : codexModels) {
+            assertTrue("Codex model must be OpenAI: " + m,
+                    m.startsWith("o1") || m.startsWith("o3") || m.startsWith("gpt-"));
+        }
+    }
+
+    @Test
+    public void isAlienModelForAgentDetectsMismatches() {
+        assertTrue(CLIAgentManager.isAlienModelForAgent("antigravity", "claude-3-7-sonnet"));
+        assertTrue(CLIAgentManager.isAlienModelForAgent("antigravity", "gpt-4o"));
+        assertFalse(CLIAgentManager.isAlienModelForAgent("antigravity", "gemini-2.5-pro"));
+
+        assertTrue(CLIAgentManager.isAlienModelForAgent("claude_code", "gemini-2.5-pro"));
+        assertTrue(CLIAgentManager.isAlienModelForAgent("claude_code", "o3-mini"));
+        assertFalse(CLIAgentManager.isAlienModelForAgent("claude_code", "claude-3-7-sonnet"));
+
+        assertTrue(CLIAgentManager.isAlienModelForAgent("codex", "claude-3-7-sonnet"));
+        assertTrue(CLIAgentManager.isAlienModelForAgent("codex", "gemini-2.0-flash"));
+        assertFalse(CLIAgentManager.isAlienModelForAgent("codex", "o3-mini"));
+    }
 }

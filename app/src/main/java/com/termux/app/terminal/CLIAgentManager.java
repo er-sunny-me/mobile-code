@@ -602,10 +602,11 @@ public class CLIAgentManager {
             case "opencode":
                 return "deepseek-r1";
             case "kiro":
+                return "claude-3-7-sonnet";
             case "kilo":
                 return "claude-3-7-sonnet";
             case "grok":
-                return "grok-2";
+                return "grok-3";
             case "github_copilot":
                 return "gpt-4o";
             default:
@@ -613,7 +614,29 @@ public class CLIAgentManager {
         }
     }
 
-    public List<String> getAvailableModels(String agentId) {
+    public static boolean isAlienModelForAgent(String agentId, String model) {
+        if (agentId == null || model == null || model.isEmpty() || model.equalsIgnoreCase("default")) {
+            return false;
+        }
+        String m = model.toLowerCase();
+        switch (agentId) {
+            case "claude_code":
+            case "kiro":
+                return !m.contains("claude");
+            case "antigravity":
+                return !m.contains("gemini");
+            case "codex":
+                return !m.contains("gpt") && !m.startsWith("o1") && !m.startsWith("o3") && !m.startsWith("o4");
+            case "grok":
+                return !m.contains("grok");
+            case "github_copilot":
+                return !m.contains("gpt") && !m.contains("claude") && !m.startsWith("o1");
+            default:
+                return false;
+        }
+    }
+
+    public static List<String> getAvailableModels(String agentId) {
         List<String> models = new ArrayList<>();
         if (agentId == null) agentId = "";
         switch (agentId) {
@@ -627,28 +650,42 @@ public class CLIAgentManager {
                 models.add("gemini-2.5-pro");
                 models.add("gemini-2.0-pro");
                 models.add("gemini-2.0-flash");
-                models.add("claude-3-7-sonnet");
+                models.add("gemini-2.0-flash-thinking");
+                models.add("gemini-1.5-pro");
+                models.add("gemini-1.5-flash");
                 break;
             case "codex":
                 models.add("o3-mini");
                 models.add("o1");
+                models.add("o1-mini");
                 models.add("gpt-4o");
+                models.add("gpt-4o-mini");
                 models.add("gpt-4.5-preview");
                 break;
-            case "opencode":
-                models.add("deepseek-r1");
+            case "kiro":
                 models.add("claude-3-7-sonnet");
+                models.add("claude-3-5-sonnet");
+                models.add("claude-3-5-haiku");
+                break;
+            case "kilo":
+                models.add("claude-3-7-sonnet");
+                models.add("claude-3-5-sonnet");
+                models.add("deepseek-r1");
+                models.add("deepseek-v3");
                 models.add("gpt-4o");
                 models.add("gemini-2.0-flash");
                 break;
-            case "kiro":
-            case "kilo":
-                models.add("claude-3-7-sonnet");
+            case "opencode":
                 models.add("deepseek-r1");
+                models.add("deepseek-v3");
+                models.add("claude-3-7-sonnet");
+                models.add("claude-3-5-sonnet");
                 models.add("gpt-4o");
-                models.add("claude-3-5-haiku");
+                models.add("gemini-2.0-flash");
                 break;
             case "grok":
+                models.add("grok-3");
+                models.add("grok-3-mini");
                 models.add("grok-2");
                 models.add("grok-2-mini");
                 models.add("grok-beta");
@@ -656,7 +693,8 @@ public class CLIAgentManager {
             case "github_copilot":
                 models.add("gpt-4o");
                 models.add("claude-3-5-sonnet");
-                models.add("o1-preview");
+                models.add("o1");
+                models.add("o1-mini");
                 break;
             default:
                 models.add("default");
@@ -666,11 +704,24 @@ public class CLIAgentManager {
     }
 
     public String getAgentModel(String agentId) {
-        return prefs.getString(KEY_AGENT_MODEL_PREFIX + agentId, defaultModelForAgent(agentId));
+        String defaultModel = defaultModelForAgent(agentId);
+        String saved = prefs.getString(KEY_AGENT_MODEL_PREFIX + agentId, null);
+        if (saved == null || saved.isEmpty() || saved.equalsIgnoreCase("default")) {
+            return defaultModel;
+        }
+        if (isAlienModelForAgent(agentId, saved)) {
+            setAgentModel(agentId, null);
+            return defaultModel;
+        }
+        return saved;
     }
 
     public void setAgentModel(String agentId, String model) {
-        prefs.edit().putString(KEY_AGENT_MODEL_PREFIX + agentId, model).apply();
+        if (model == null || model.isEmpty() || model.equalsIgnoreCase("default")) {
+            prefs.edit().remove(KEY_AGENT_MODEL_PREFIX + agentId).apply();
+        } else {
+            prefs.edit().putString(KEY_AGENT_MODEL_PREFIX + agentId, model).apply();
+        }
     }
 
     /**
@@ -789,7 +840,8 @@ public class CLIAgentManager {
             }
             String effort = thinkingTokens == 0 ? "low" : (thinkingTokens <= 8192 ? "medium" : "high");
             cmd = cmd + " --reasoning-effort " + effort;
-        } else if (agent.id.equals("opencode") || agent.id.equals("grok")) {
+        } else if (agent.id.equals("opencode") || agent.id.equals("grok")
+                || agent.id.equals("kiro") || agent.id.equals("kilo") || agent.id.equals("github_copilot")) {
             if (selectedModel != null && !selectedModel.isEmpty() && !selectedModel.equals("default")) {
                 cmd = cmd + " --model " + escapeForDoubleQuotes(selectedModel);
             }

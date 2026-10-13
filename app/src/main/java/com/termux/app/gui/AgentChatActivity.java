@@ -445,6 +445,7 @@ public class AgentChatActivity extends AppCompatActivity {
                 suppressSpinnerCallback = true;
                 agentSpinner.setSelection(i);
                 suppressSpinnerCallback = false;
+                agentManager.setSelectedAgent(session.agentId);
                 break;
             }
         }
@@ -560,14 +561,30 @@ public class AgentChatActivity extends AppCompatActivity {
             openInTerminal(null);
             return;
         }
-        if (prompt.equalsIgnoreCase("/model")) {
+        if (prompt.equalsIgnoreCase("/model") || prompt.startsWith("/model ")) {
+            String modelArg = prompt.length() > 7 ? prompt.substring(7).trim() : "";
             promptInput.setText("");
-            showModelSelectionDialog();
+            CLIAgentManager.CLIAgent cur = selectedAgent();
+            if (!modelArg.isEmpty() && cur != null) {
+                agentManager.setAgentModel(cur.id, modelArg);
+                updateModelAndThinkingChips();
+                Toast.makeText(this, "Model set to " + modelArg, Toast.LENGTH_SHORT).show();
+            } else {
+                showModelSelectionDialog();
+            }
             return;
         }
-        if (prompt.equalsIgnoreCase("/thinking")) {
+        if (prompt.equalsIgnoreCase("/thinking") || prompt.startsWith("/thinking ")) {
+            String thinkingArg = prompt.length() > 10 ? prompt.substring(10).trim() : "";
             promptInput.setText("");
-            showThinkingLevelSelectionDialog();
+            CLIAgentManager.CLIAgent cur = selectedAgent();
+            if (!thinkingArg.isEmpty() && cur != null) {
+                agentManager.setAgentThinkingLevel(cur.id, thinkingArg);
+                updateModelAndThinkingChips();
+                Toast.makeText(this, "Thinking set to " + thinkingArg, Toast.LENGTH_SHORT).show();
+            } else {
+                showThinkingLevelSelectionDialog();
+            }
             return;
         }
 
@@ -1089,11 +1106,7 @@ public class AgentChatActivity extends AppCompatActivity {
 
         if (tvCurrentModel != null) {
             String model = agentManager.getAgentModel(agent.id);
-            if (model == null || model.isEmpty()) {
-                tvCurrentModel.setText("Model: Default");
-            } else {
-                tvCurrentModel.setText(model);
-            }
+            tvCurrentModel.setText(model);
         }
 
         if (tvCurrentThinking != null) {
@@ -1111,27 +1124,45 @@ public class AgentChatActivity extends AppCompatActivity {
         if (agent == null) return;
 
         List<String> models = agentManager.getAvailableModels(agent.id);
+        String currentModel = agentManager.getAgentModel(agent.id);
+        String defaultModel = CLIAgentManager.defaultModelForAgent(agent.id);
+
         List<String> displayItems = new ArrayList<>();
-        displayItems.add("Default (" + agent.name + " built-in)");
-        displayItems.addAll(models);
+        int selectedIndex = 0;
+        displayItems.add("Default (" + defaultModel + ")");
+        for (int i = 0; i < models.size(); i++) {
+            String m = models.get(i);
+            displayItems.add(m);
+            if (m.equalsIgnoreCase(currentModel)) {
+                selectedIndex = i + 1;
+            }
+        }
         displayItems.add("✏️ Custom model…");
+        if (selectedIndex == 0 && currentModel != null
+                && !currentModel.equalsIgnoreCase("default")
+                && !currentModel.equalsIgnoreCase(defaultModel)) {
+            selectedIndex = displayItems.size() - 1;
+        }
 
         String[] itemArray = displayItems.toArray(new String[0]);
 
         new AlertDialog.Builder(this)
-                .setTitle("Select Model for " + agent.name)
-                .setItems(itemArray, (dialog, which) -> {
+                .setTitle("Select Model (" + agent.name + ")")
+                .setSingleChoiceItems(itemArray, selectedIndex, (dialog, which) -> {
                     if (which == 0) {
                         agentManager.setAgentModel(agent.id, null);
                         updateModelAndThinkingChips();
-                        Toast.makeText(this, "Model set to Default", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Model set to Default (" + defaultModel + ")", Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
                     } else if (which == itemArray.length - 1) {
+                        dialog.dismiss();
                         showCustomModelInputDialog(agent);
                     } else {
                         String selected = models.get(which - 1);
                         agentManager.setAgentModel(agent.id, selected);
                         updateModelAndThinkingChips();
-                        Toast.makeText(this, "Model changed to " + selected, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Model set to " + selected, Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
                     }
                 })
                 .setNegativeButton("Cancel", null)
