@@ -5,6 +5,9 @@ import android.content.SharedPreferences;
 
 import com.termux.shared.termux.TermuxConstants;
 
+import android.os.Handler;
+import android.os.Looper;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -12,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -563,6 +567,7 @@ public class CLIAgentManager {
 
     public static final String KEY_AGENT_MODEL_PREFIX = "agent_model_";
     public static final String KEY_AGENT_THINKING_PREFIX = "agent_thinking_";
+    public static final String KEY_AGENT_LIVE_MODELS_PREFIX = "agent_live_models_";
 
     public static final List<String> THINKING_LEVELS = Collections.unmodifiableList(
             Arrays.asList("Off", "Low (2k)", "Medium (8k)", "High (16k)", "Max (32k)")
@@ -636,7 +641,7 @@ public class CLIAgentManager {
         }
     }
 
-    public static List<String> getAvailableModels(String agentId) {
+    public static List<String> getKnownModels(String agentId) {
         List<String> models = new ArrayList<>();
         if (agentId == null) agentId = "";
         switch (agentId) {
@@ -701,6 +706,180 @@ public class CLIAgentManager {
                 break;
         }
         return models;
+    }
+
+    public static List<String> getAvailableModels(String agentId) {
+        return getKnownModels(agentId);
+    }
+
+    public List<String> getAvailableModelsForAgent(String agentId) {
+        List<String> cached = getCachedLiveModels(agentId);
+        if (!cached.isEmpty()) {
+            return cached;
+        }
+        return getKnownModels(agentId);
+    }
+
+    public interface LiveModelsCallback {
+        void onModelsLoaded(List<String> models);
+    }
+
+    public static boolean looksLikeModelName(String agentId, String token) {
+        if (token == null || token.length() < 3 || token.length() > 50) return false;
+        String lower = token.toLowerCase();
+        if (lower.endsWith(".tar") || lower.endsWith(".gz") || lower.endsWith(".bin")
+                || lower.endsWith(".sh") || lower.endsWith(".js") || lower.endsWith(".json")
+                || lower.startsWith("http") || lower.contains("version") || lower.contains("commit")
+                || lower.contains("path") || lower.contains("usage") || lower.contains("help")
+                || lower.contains("flag") || lower.contains("option")) {
+            return false;
+        }
+        if (agentId == null) agentId = "";
+        switch (agentId) {
+            case "antigravity":
+                return lower.startsWith("gemini-") || lower.startsWith("gemini/");
+            case "claude_code":
+            case "kiro":
+                return lower.startsWith("claude-") || lower.startsWith("claude/");
+            case "codex":
+                return lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4")
+                        || lower.startsWith("gpt-") || lower.startsWith("openai/");
+            case "grok":
+                return lower.startsWith("grok-") || lower.startsWith("grok/");
+            case "github_copilot":
+                return lower.startsWith("gpt-") || lower.startsWith("claude-") || lower.startsWith("o1");
+            case "opencode":
+            case "kilo":
+                return lower.startsWith("deepseek") || lower.startsWith("claude")
+                        || lower.startsWith("gpt") || lower.startsWith("gemini")
+                        || lower.startsWith("o1") || lower.startsWith("o3");
+            default:
+                return lower.startsWith("gemini-") || lower.startsWith("claude-")
+                        || lower.startsWith("gpt-") || lower.startsWith("deepseek-")
+                        || lower.startsWith("o1") || lower.startsWith("o3");
+        }
+    }
+
+    public static List<String> parseModelsFromCliOutput(String agentId, String output) {
+        List<String> found = new ArrayList<>();
+        if (output == null || output.trim().isEmpty()) return found;
+        Set<String> seen = new LinkedHashSet<>();
+
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\b([a-zA-Z0-9]+(?:[-./][a-zA-Z0-9]+)+)\\b");
+        java.util.regex.Matcher matcher = pattern.matcher(output);
+        while (matcher.find()) {
+            String token = matcher.group(1).trim();
+            if (token.contains("/")) {
+                String sub = token.substring(token.lastIndexOf('/') + 1);
+                if (looksLikeModelName(agentId, sub)) {
+                    token = sub;
+                }
+            }
+            if (looksLikeModelName(agentId, token) && !seen.contains(token)) {
+                seen.add(token);
+                found.add(token);
+            }
+        }
+
+        String[] lines = output.split("\\r?\\n");
+        for (String line : lines) {
+            String trimmed = line.trim();
+            trimmed = trimmed.replaceFirst("^[-*•\\d.]+\\s*", "").trim();
+            int spaceIdx = trimmed.indexOf(' ');
+            String candidate = (spaceIdx > 0) ? trimmed.substring(0, spaceIdx) : trimmed;
+            if (candidate.contains("/")) {
+                String sub = candidate.substring(candidate.lastIndexOf('/') + 1);
+                if (looksLikeModelName(agentId, sub)) candidate = sub;
+            }
+            if (looksLikeModelName(agentId, candidate) && !seen.contains(candidate)) {
+                seen.add(candidate);
+                found.add(candidate);
+            }
+        }
+        return found;
+    }
+
+    public static String buildModelProbeCommand(CLIAgent agent) {
+        if (agent == null) return null;
+        switch (agent.id) {
+            case "antigravity":
+                return "export PATH=\"$HOME/.local/bin:$PATH\"; hash -r 2>/dev/null || true; { agy models 2>&1 || agy --help 2>&1; }";
+            case "claude_code":
+                return "{ claude models 2>&1 || claude --help 2>&1; }";
+            case "codex":
+                return "{ codex models 2>&1 || codex --help 2>&1; }";
+            case "opencode":
+                return "export PATH=\"$HOME/.opencode/bin:$PATH\"; hash -r 2>/dev/null || true; { opencode models 2>&1 || opencode --help 2>&1; }";
+            case "kiro":
+                return "export PATH=\"$HOME/.local/bin:$PATH\"; hash -r 2>/dev/null || true; { kiro-cli models 2>&1 || kiro-cli --help 2>&1; }";
+            case "kilo":
+                return "export PATH=\"$HOME/.local/bin:$PATH\"; hash -r 2>/dev/null || true; { kilo models 2>&1 || kilo --help 2>&1; }";
+            case "grok":
+                return "export PATH=\"$HOME/.grok/bin:$PATH\"; hash -r 2>/dev/null || true; { grok models 2>&1 || grok --help 2>&1; }";
+            case "github_copilot":
+                return "{ copilot models 2>&1 || copilot --help 2>&1; }";
+            default:
+                return null;
+        }
+    }
+
+    public List<String> queryLiveModelsSync(CLIAgent agent) {
+        if (agent == null) return Collections.emptyList();
+        String cmd = buildModelProbeCommand(agent);
+        if (cmd == null) return getKnownModels(agent.id);
+
+        String rawOutput = "";
+        if (isWorkshopAvailable()) {
+            String installed = installedWorkshopDistro();
+            String wrapped = wrapForWorkshop(cmd, installed != null ? installed : getWorkshopDistro(context));
+            rawOutput = runProbeScript(wrapped);
+        }
+        if (rawOutput == null || rawOutput.trim().isEmpty()) {
+            rawOutput = runProbeScript(cmd);
+        }
+
+        List<String> parsed = parseModelsFromCliOutput(agent.id, rawOutput);
+        if (!parsed.isEmpty()) {
+            saveLiveModelsCache(agent.id, parsed);
+            return parsed;
+        }
+
+        List<String> cached = getCachedLiveModels(agent.id);
+        if (!cached.isEmpty()) return cached;
+        return getKnownModels(agent.id);
+    }
+
+    public void queryLiveModelsAsync(CLIAgent agent, LiveModelsCallback callback) {
+        new Thread(() -> {
+            List<String> models = queryLiveModelsSync(agent);
+            if (callback != null) {
+                new Handler(Looper.getMainLooper()).post(() -> callback.onModelsLoaded(models));
+            }
+        }).start();
+    }
+
+    public void saveLiveModelsCache(String agentId, List<String> models) {
+        if (models == null || models.isEmpty()) return;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < models.size(); i++) {
+            if (i > 0) sb.append(',');
+            sb.append(models.get(i));
+        }
+        prefs.edit().putString(KEY_AGENT_LIVE_MODELS_PREFIX + agentId, sb.toString()).apply();
+    }
+
+    public List<String> getCachedLiveModels(String agentId) {
+        String saved = prefs.getString(KEY_AGENT_LIVE_MODELS_PREFIX + agentId, null);
+        if (saved == null || saved.trim().isEmpty()) return Collections.emptyList();
+        String[] parts = saved.split(",");
+        List<String> list = new ArrayList<>();
+        for (String p : parts) {
+            String trimmed = p.trim();
+            if (!trimmed.isEmpty() && !list.contains(trimmed)) {
+                list.add(trimmed);
+            }
+        }
+        return list;
     }
 
     public String getAgentModel(String agentId) {

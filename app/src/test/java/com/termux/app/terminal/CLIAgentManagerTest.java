@@ -372,4 +372,34 @@ public class CLIAgentManagerTest {
         assertTrue(CLIAgentManager.isAlienModelForAgent("codex", "gemini-2.0-flash"));
         assertFalse(CLIAgentManager.isAlienModelForAgent("codex", "o3-mini"));
     }
+
+    @Test
+    public void parseModelsFromCliOutputExtractsValidModels() {
+        String agySample = "Available models:\n" +
+                "- gemini-2.5-pro (default)\n" +
+                "- gemini-2.0-flash\n" +
+                "- gemini-2.0-pro\n" +
+                "Use agy --model <model> to switch.\n";
+        java.util.List<String> parsedAgy = CLIAgentManager.parseModelsFromCliOutput("antigravity", agySample);
+        assertTrue(parsedAgy.contains("gemini-2.5-pro"));
+        assertTrue(parsedAgy.contains("gemini-2.0-flash"));
+        assertTrue(parsedAgy.contains("gemini-2.0-pro"));
+        assertFalse(parsedAgy.contains("agy"));
+
+        String claudeHelp = "Usage: claude [options]\n" +
+                "  --model <model>  Model to use: claude-3-7-sonnet, claude-3-5-sonnet, claude-3-5-haiku\n";
+        java.util.List<String> parsedClaude = CLIAgentManager.parseModelsFromCliOutput("claude_code", claudeHelp);
+        assertTrue(parsedClaude.contains("claude-3-7-sonnet"));
+        assertTrue(parsedClaude.contains("claude-3-5-sonnet"));
+        assertTrue(parsedClaude.contains("claude-3-5-haiku"));
+        assertFalse(parsedClaude.contains("options"));
+    }
+
+    @Test
+    public void buildModelProbeCommandReturnsNonEmptyForSupportedAgents() {
+        assertNotNull(CLIAgentManager.buildModelProbeCommand(CLIAgentManager.findAgent("antigravity")));
+        assertNotNull(CLIAgentManager.buildModelProbeCommand(CLIAgentManager.findAgent("claude_code")));
+        assertNotNull(CLIAgentManager.buildModelProbeCommand(CLIAgentManager.findAgent("codex")));
+        assertNotNull(CLIAgentManager.buildModelProbeCommand(CLIAgentManager.findAgent("opencode")));
+    }
 }

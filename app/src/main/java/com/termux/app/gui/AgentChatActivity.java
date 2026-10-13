@@ -393,6 +393,7 @@ public class AgentChatActivity extends AppCompatActivity {
                 hideCompactSlashSuggestions();
                 updateRunningLabelFor(agent);
                 updateModelAndThinkingChips();
+                agentManager.queryLiveModelsAsync(agent, liveModels -> updateModelAndThinkingChips());
             }
 
             @Override
@@ -406,6 +407,7 @@ public class AgentChatActivity extends AppCompatActivity {
             if (promptInput != null) {
                 promptInput.setHint("Message " + current.name + "…");
             }
+            agentManager.queryLiveModelsAsync(current, liveModels -> updateModelAndThinkingChips());
         }
         updateModelAndThinkingChips();
     }
@@ -1123,7 +1125,7 @@ public class AgentChatActivity extends AppCompatActivity {
         CLIAgentManager.CLIAgent agent = selectedAgent();
         if (agent == null) return;
 
-        List<String> models = agentManager.getAvailableModels(agent.id);
+        List<String> models = agentManager.getAvailableModelsForAgent(agent.id);
         String currentModel = agentManager.getAgentModel(agent.id);
         String defaultModel = CLIAgentManager.defaultModelForAgent(agent.id);
 
@@ -1137,11 +1139,16 @@ public class AgentChatActivity extends AppCompatActivity {
                 selectedIndex = i + 1;
             }
         }
+        displayItems.add("🔄 Query / Refresh from CLI (" + agent.name + ")");
         displayItems.add("✏️ Custom model…");
+
+        final int refreshIndex = displayItems.size() - 2;
+        final int customIndex = displayItems.size() - 1;
+
         if (selectedIndex == 0 && currentModel != null
                 && !currentModel.equalsIgnoreCase("default")
                 && !currentModel.equalsIgnoreCase(defaultModel)) {
-            selectedIndex = displayItems.size() - 1;
+            selectedIndex = customIndex;
         }
 
         String[] itemArray = displayItems.toArray(new String[0]);
@@ -1154,7 +1161,15 @@ public class AgentChatActivity extends AppCompatActivity {
                         updateModelAndThinkingChips();
                         Toast.makeText(this, "Model set to Default (" + defaultModel + ")", Toast.LENGTH_SHORT).show();
                         dialog.dismiss();
-                    } else if (which == itemArray.length - 1) {
+                    } else if (which == refreshIndex) {
+                        dialog.dismiss();
+                        Toast.makeText(this, "Querying " + agent.name + " CLI for available models…", Toast.LENGTH_SHORT).show();
+                        agentManager.queryLiveModelsAsync(agent, liveModels -> {
+                            updateModelAndThinkingChips();
+                            Toast.makeText(this, "Loaded " + liveModels.size() + " models from " + agent.name, Toast.LENGTH_SHORT).show();
+                            showModelSelectionDialog();
+                        });
+                    } else if (which == customIndex) {
                         dialog.dismiss();
                         showCustomModelInputDialog(agent);
                     } else {
