@@ -71,20 +71,6 @@
                 android:src="@android:drawable/ic_menu_gallery"
                 app:tint="@color/zc_text_white" />
 
-            <!-- Keyboard Toggle Button -->
-            <Button
-                android:id="@+id/btn_toggle_keyboard"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:layout_marginEnd="8dp"
-                android:layout_gravity="center_vertical"
-                android:backgroundTint="@color/zc_bg_dark"
-                android:text="Keyboard"
-                android:textColor="@color/zc_text_white"
-                android:textSize="12sp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:paddingHorizontal="8dp" />
 
             <!-- Full Screen Toggle Button -->
             <ImageButton

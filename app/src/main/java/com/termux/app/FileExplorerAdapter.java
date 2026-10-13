@@ -8,6 +8,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.termux.R;
+import com.termux.shared.termux.TermuxConstants;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,7 +45,7 @@ public class FileExplorerAdapter extends RecyclerView.Adapter<FileExplorerAdapte
             });
             
             // Add '..' to go up if not at root
-            if (!dir.getAbsolutePath().equals("/data/data/com.termux/files/home")) {
+            if (!dir.getAbsolutePath().equals(TermuxConstants.TERMUX_HOME_DIR_PATH)) {
                 this.files.add(new File(dir, ".."));
             }
             

@@ -152,7 +152,7 @@ public class AIChatManager {
                 handler.postDelayed(() -> {
                     TerminalSession newSession = activity.getCurrentSession();
                     if (newSession != null) {
-                        newSession.write("clear && " + agent.installCommand + " && exit\r\n");
+                        newSession.write("clear && " + cliAgentManager.buildInstallCommand(agent) + " && exit\r\n");
                     }
                 }, 500);
                 break;

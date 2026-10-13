@@ -2,14 +2,14 @@
 
 <!DOCTYPE resources [
     <!ENTITY TERMUX_PACKAGE_NAME "com.termux">
-    <!ENTITY TERMUX_APP_NAME "Novus IDE">
-    <!ENTITY TERMUX_APP_NAME_LOWER "novus-ide">
-    <!ENTITY TERMUX_API_APP_NAME "Novus IDE: API">
-    <!ENTITY TERMUX_BOOT_APP_NAME "Novus IDE: Boot">
-    <!ENTITY TERMUX_FLOAT_APP_NAME "Novus IDE: Float">
-    <!ENTITY TERMUX_STYLING_APP_NAME "Novus IDE: Styling">
-    <!ENTITY TERMUX_TASKER_APP_NAME "Novus IDE: Tasker">
-    <!ENTITY TERMUX_WIDGET_APP_NAME "Novus IDE: Widget">
+    <!ENTITY TERMUX_APP_NAME "Mobile Code">
+    <!ENTITY TERMUX_APP_NAME_LOWER "mobile-code">
+    <!ENTITY TERMUX_API_APP_NAME "Mobile Code: API">
+    <!ENTITY TERMUX_BOOT_APP_NAME "Mobile Code: Boot">
+    <!ENTITY TERMUX_FLOAT_APP_NAME "Mobile Code: Float">
+    <!ENTITY TERMUX_STYLING_APP_NAME "Mobile Code: Styling">
+    <!ENTITY TERMUX_TASKER_APP_NAME "Mobile Code: Tasker">
+    <!ENTITY TERMUX_WIDGET_APP_NAME "Mobile Code: Widget">
     <!ENTITY TERMUX_PREFIX_DIR_PATH "/data/data/com.termux/files/usr">
     ]>
 

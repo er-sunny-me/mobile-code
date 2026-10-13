@@ -33,4 +33,26 @@
     <color name="white">#FFFFFF</color>
     <color name="red_400">#F85149</color>
     <color name="grey_500">#21262D</color>
+
+    <!-- Agent GUI (chat) -->
+    <color name="zc_chat_bg">#0B0B0B</color>
+    <color name="zc_chat_agent_bubble">#1B1B22</color>
+    <color name="zc_chat_agent_border">#2A2A33</color>
+    <color name="zc_chat_user_bubble">#E91E4C</color>
+    <color name="zc_chat_error_bubble">#2A1518</color>
+    <color name="zc_chat_error_border">#FF3B30</color>
+    <color name="zc_chat_status_text">#7A7A7A</color>
+    <color name="zc_chat_meta_text">#6E6E78</color>
+    <color name="zc_badge_installed">#0D2818</color>
+    <color name="zc_badge_installed_border">#1B5E20</color>
+    <color name="zc_badge_installed_text">#00E676</color>
+    <color name="zc_badge_missing">#2A2410</color>
+    <color name="zc_badge_missing_border">#5E4B1B</color>
+    <color name="zc_badge_missing_text">#FFC107</color>
+
+    <!-- Agent Thinking Colors -->
+    <color name="zc_chat_thinking_bubble">#161324</color>
+    <color name="zc_chat_thinking_border">#3B325A</color>
+    <color name="zc_chat_thinking_text">#A5B4FC</color>
+    <color name="zc_chat_thinking_meta">#818CF8</color>
 </resources>

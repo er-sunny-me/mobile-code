@@ -88,8 +88,9 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         
         String cwdToCd = intent.getStringExtra("com.termux.execute.cwd");
         String fileToRun = intent.getStringExtra("com.termux.execute.file_to_run");
+        String commandToRun = intent.getStringExtra("com.termux.execute.command");
         
-        if (cwdToCd != null || fileToRun != null) {
+        if (cwdToCd != null || fileToRun != null || commandToRun != null) {
             TerminalSession session = mActivity.getCurrentSession();
             if (session != null && session.getEmulator() != null) {
                 if (cwdToCd != null) {
@@ -103,9 +104,13 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
                     else cmd = "cat \"" + fileToRun + "\"";
                     session.write(cmd + "\n");
                 }
+                if (commandToRun != null) {
+                    session.write(commandToRun + "\n");
+                }
             }
             intent.removeExtra("com.termux.execute.cwd"); // Consume it so it only runs once
             intent.removeExtra("com.termux.execute.file_to_run");
+            intent.removeExtra("com.termux.execute.command");
         }
     }
 
@@ -489,16 +494,19 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
 
             if (!isFailSafe) {
                 executablePath = TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/bin/bash";
+                String distro = mActivity.getSharedPreferences("ZeroCodePrefs", android.content.Context.MODE_PRIVATE)
+                    .getString("workshop_distro", "ubuntu");
+                if (!distro.matches("[a-z][a-z0-9_.-]*")) distro = "ubuntu";
                 String bootScript = "if ! command -v proot-distro &> /dev/null; then " +
-                    "echo -e '\\e[1;32m[Novus IDE] Installing Ubuntu CLI Workshop Environment...\\e[0m'; " +
+                    "echo -e '\\e[1;32m[Mobile Code] Installing Ubuntu CLI Workshop Environment...\\e[0m'; " +
                     "pkg update -y && pkg install proot-distro -y; " +
                     "fi; " +
-                    "if [ ! -d \"$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu\" ]; then " +
-                    "echo -e '\\e[1;34m[Novus IDE] Downloading Ubuntu Rootfs (This may take a few minutes)...\\e[0m'; " +
-                    "proot-distro install ubuntu; " +
+                    "if [ ! -d \"$PREFIX/var/lib/proot-distro/installed-rootfs/" + distro + "\" ] && [ ! -d \"$PREFIX/var/lib/proot-distro/containers/" + distro + "/rootfs\" ]; then " +
+                    "echo -e '\\e[1;34m[Mobile Code] Downloading " + distro + " Rootfs (This may take a few minutes)...\\e[0m'; " +
+                    "proot-distro install " + distro + "; " +
                     "fi; " +
-                    "echo -e '\\e[1;32m[Novus IDE] Starting Ubuntu CLI Workshop...\\e[0m'; " +
-                    "proot-distro login ubuntu || { echo -e '\\e[1;31m[Novus IDE] Failed to start Ubuntu. Dropping to bash...\\e[0m'; bash; }";
+                    "echo -e '\\e[1;32m[Mobile Code] Starting " + distro + " CLI Workshop...\\e[0m'; " +
+                    "proot-distro login " + distro + " || { echo -e '\\e[1;31m[Mobile Code] Failed to start " + distro + ". Dropping to bash...\\e[0m'; bash; }";
                 arguments = new String[]{"-c", bootScript};
             }
 

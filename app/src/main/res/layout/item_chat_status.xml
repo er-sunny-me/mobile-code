@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small centered status line (installing, running, finished). -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/message_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:paddingStart="32dp"
+    android:paddingEnd="32dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:text="Agent started"
+    android:textColor="@color/zc_chat_status_text"
+    android:textSize="12sp" />

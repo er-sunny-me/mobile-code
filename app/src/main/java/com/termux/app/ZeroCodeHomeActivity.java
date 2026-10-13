@@ -88,6 +88,12 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
+        // First launch: show the setup wizard (permissions, Termux base, Linux
+        // system, coding agents) on top of home. Home stays underneath.
+        if (!com.termux.app.setup.SetupWizardActivity.isSetupCompleted(this)) {
+            startActivity(new Intent(this, com.termux.app.setup.SetupWizardActivity.class));
+        }
+
         requestManageExternalStorageIfNeeded();
 
         android.content.SharedPreferences prefs = getSharedPreferences("ZeroCodePrefs", MODE_PRIVATE);
@@ -186,6 +192,18 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
             btnTerminalFab.setOnClickListener(v -> launchTerminal());
         }
 
+        // Agent GUI entry points
+        View btnAgentChat = findViewById(R.id.btn_agent_chat);
+        if (btnAgentChat != null) {
+            btnAgentChat.setOnClickListener(v ->
+                    startActivity(new Intent(this, com.termux.app.gui.AgentChatActivity.class)));
+        }
+
+        View btnAgentDashboard = findViewById(R.id.btn_agent_dashboard);
+        if (btnAgentDashboard != null) {
+            btnAgentDashboard.setOnClickListener(v ->
+                    startActivity(new Intent(this, com.termux.app.gui.AgentDashboardActivity.class)));
+        }
 
     }
 
@@ -349,20 +367,22 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
     }
 
     private void closeTab(File file) {
+        java.util.List<File> order = new java.util.ArrayList<>(openFiles.keySet());
+        int closedIndex = order.indexOf(file);
         openFiles.remove(file);
-        
+
         if (openFiles.isEmpty()) {
             closeCodeEditor();
+            return;
+        }
+
+        if (file.equals(currentEditingFile)) {
+            // Focus whichever tab slid into the closed tab's slot, else the previous one.
+            java.util.List<File> remaining = new java.util.ArrayList<>(openFiles.keySet());
+            int nextIndex = Math.min(Math.max(closedIndex, 0), remaining.size() - 1);
+            switchTab(remaining.get(nextIndex));
         } else {
-            if (file.equals(currentEditingFile)) {
-                File nextFile = null;
-                for (File f : openFiles.keySet()) {
-                    nextFile = f;
-                }
-                switchTab(nextFile);
-            } else {
-                renderTabs();
-            }
+            renderTabs();
         }
     }
 
@@ -371,7 +391,7 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
         editorContainer.setVisibility(View.GONE);
         currentEditingFile = null;
         if (tvAppTitle != null) {
-            tvAppTitle.setText("Novus IDE");
+            tvAppTitle.setText(getString(R.string.app_name));
         }
         
         if (btnHomeEditorSave != null) btnHomeEditorSave.setVisibility(View.GONE);
@@ -485,7 +505,7 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
                 if (btnMain != null) btnMain.setVisibility(View.VISIBLE);
                 
                 TextView tvEmptyText = findViewById(R.id.tv_empty_state_text);
-                if (tvEmptyText != null) tvEmptyText.setText("Novus IDE");
+                if (tvEmptyText != null) tvEmptyText.setText(getString(R.string.app_name));
                 
                 TextView tvEmptySubtext = findViewById(R.id.tv_empty_state_subtext);
                 if (tvEmptySubtext != null) tvEmptySubtext.setText("Swipe right or tap the top-left menu to browse your workspace.");

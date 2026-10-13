@@ -90,6 +90,4 @@
         <item name="android:activityCloseExitAnimation">@anim/slide_down</item>
     </style>
 
-    <style name="Theme.MyApplication" parent="android:Theme.Material.Light.NoActionBar" />
-
 </resources>

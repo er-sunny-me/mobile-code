@@ -73,6 +73,7 @@ public class SettingsActivity extends AppCompatActivity {
                     configureTermuxTaskerPreference(context);
                     configureTermuxWidgetPreference(context);
                     configureSyncWorkshopPreference(context);
+                    configureSetupWizardPreference(context);
                     configureAboutPreference(context);
                     configureDonatePreference(context);
                     configureUpdateCheckPreference(context);
@@ -131,8 +132,22 @@ public class SettingsActivity extends AppCompatActivity {
             }
         }
 
-        private void configureSyncWorkshopPreference(@NonNull Context context) {
-            Preference syncWorkshopPreference = findPreference("sync_workshop");
+        private void configureSetupWizardPreference(@NonNull Context context) {
+            Preference setupPreference = findPreference("setup_wizard");
+            if (setupPreference != null) {
+                setupPreference.setOnPreferenceClickListener(preference -> {
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() ->
+                            getActivity().startActivity(new android.content.Intent(
+                                getActivity(),
+                                com.termux.app.setup.SetupWizardActivity.class)));
+                    }
+                    return true;
+                });
+            }
+        }
+
+        private void configureSyncWorkshopPreference(@NonNull Context context) {            Preference syncWorkshopPreference = findPreference("sync_workshop");
             if (syncWorkshopPreference != null) {
                 syncWorkshopPreference.setOnPreferenceClickListener(preference -> {
                     new Thread(() -> {

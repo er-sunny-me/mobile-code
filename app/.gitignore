@@ -1,1 +1,4 @@
 /build
+# Workshop bundle (Ubuntu rootfs + agent binaries, ~500MB) is downloaded at
+# build time by ./gradlew downloadWorkshopBundle — never commit it.
+/src/main/assets/workshop/

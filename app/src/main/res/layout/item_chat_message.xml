@@ -1,47 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Agent / error bubble. Left aligned with the agent's emoji avatar.
+  Used for ChatMessage.Type.AGENT and ChatMessage.Type.ERROR.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/chat_message_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:padding="8dp">
+    android:paddingStart="12dp"
+    android:paddingEnd="40dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
 
-    <!-- Assistant Icon (shown for agent, hidden for user) -->
+    <!-- Agent avatar -->
     <TextView
         android:id="@+id/message_icon"
         android:layout_width="32dp"
         android:layout_height="32dp"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_agent_icon"
         android:gravity="center"
         android:text="🟠"
-        android:textSize="18sp"
-        android:background="@drawable/bg_agent_icon"
-        android:layout_marginEnd="12dp" />
+        android:textSize="17sp" />
 
-    <!-- Message Bubble -->
     <LinearLayout
-        android:id="@+id/message_bubble"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
         android:layout_weight="1"
-        android:background="#2E2E3A"
-        android:padding="12dp"
         android:orientation="vertical">
-        
+
+        <!-- Agent name + time -->
         <TextView
-            android:id="@+id/message_text"
+            android:id="@+id/message_meta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="3dp"
+            android:text="Claude Code · 12:04"
+            android:textColor="@color/zc_chat_meta_text"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:id="@+id/message_bubble"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:fontFamily="monospace"
-            android:textIsSelectable="true" />
+            android:background="@drawable/bg_bubble_agent"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/message_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textColor="@color/zc_text_primary"
+                android:textIsSelectable="true"
+                android:textSize="13sp"
+                android:lineSpacingExtra="2dp" />
+        </LinearLayout>
     </LinearLayout>
-    
-    <!-- User Spacer (to push user messages to right, handled in code) -->
-    <Space
-        android:id="@+id/message_spacer"
-        android:layout_width="48dp"
-        android:layout_height="wrap_content"
-        android:visibility="gone" />
 
 </LinearLayout>

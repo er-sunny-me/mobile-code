@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingEnd="40dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <!-- Agent avatar -->
+    <TextView
+        android:id="@+id/message_icon"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_agent_icon"
+        android:gravity="center"
+        android:text="🧠"
+        android:textSize="17sp" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Agent name + time -->
+        <TextView
+            android:id="@+id/message_meta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="3dp"
+            android:text="Agent · Thinking"
+            android:textColor="@color/zc_chat_thinking_meta"
+            android:textSize="11sp" />
+
+        <!-- Collapsible thinking card -->
+        <LinearLayout
+            android:id="@+id/thinking_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_bubble_thinking"
+            android:orientation="vertical"
+            android:padding="10dp">
+
+            <!-- Clickable header to collapse / expand -->
+            <LinearLayout
+                android:id="@+id/thinking_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:id="@+id/tv_thinking_indicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💭 Thought Process"
+                    android:textColor="#C084FC"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_thinking_duration"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:textColor="@color/zc_text_muted"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/tv_thinking_toggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="▲"
+                    android:textColor="#C084FC"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Collapsible content view -->
+            <TextView
+                android:id="@+id/tv_thinking_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="monospace"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/zc_chat_thinking_text"
+                android:textIsSelectable="true"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

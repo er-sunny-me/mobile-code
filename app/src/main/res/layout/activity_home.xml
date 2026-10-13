@@ -38,7 +38,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Novus IDE"
+                android:text="@string/app_name"
                 android:textColor="@color/zc_text_white"
                 android:textSize="20sp"
                 android:textStyle="bold"
@@ -82,6 +82,26 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_settings"
                 app:tint="@color/zc_text_gray" />
+
+            <!-- Agent Chat GUI -->
+            <ImageButton
+                android:id="@+id/btn_agent_chat"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Agent Chat"
+                android:src="@android:drawable/ic_menu_edit"
+                app:tint="@color/zc_primary_red" />
+
+            <!-- Manage / install coding agents -->
+            <ImageButton
+                android:id="@+id/btn_agent_dashboard"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Coding Agents"
+                android:src="@android:drawable/ic_menu_manage"
+                app:tint="@color/zc_text_gray" />
         </LinearLayout>
 
         <!-- Empty State Container (Centered) -->
@@ -105,7 +125,7 @@
                 android:id="@+id/tv_empty_state_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Novus IDE"
+                android:text="@string/app_name"
                 android:textColor="@color/zc_text_secondary"
                 android:textSize="20sp"
                 android:textStyle="bold"

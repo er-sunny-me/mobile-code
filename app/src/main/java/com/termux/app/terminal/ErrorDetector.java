@@ -67,6 +67,9 @@ public class ErrorDetector {
         PATTERNS.add(new PatternPair(ErrorType.GIT, Pattern.compile(
                 "(fatal: |error: failed to push|CONFLICT|merge conflict|hint: Updates were rejected)",
                 Pattern.MULTILINE)));
+        PATTERNS.add(new PatternPair(ErrorType.GENERIC, Pattern.compile(
+                "(?i)(^\\s*error:|^\\s*fatal:|^\\s*failed:|^\\s*critical:|unexpected argument|invalid option|unknown command)",
+                Pattern.MULTILINE)));
     }
 
     public static DetectedError detect(String outputBuffer, String lastCommand) {

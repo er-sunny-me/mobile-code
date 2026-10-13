@@ -46,7 +46,7 @@
         android:allowBackup="false"
         android:banner="@drawable/banner"
         android:icon="@mipmap/ic_launcher"
-        android:label="Novus IDE"
+        android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security_config"
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -54,7 +54,6 @@
         android:theme="@style/Theme.TermuxApp.DayNight.DarkActionBar"
         android:usesCleartextTraffic="true"
         tools:targetApi="m">
-
         <!--
          ═══════════════════════════════════════════════════
              ZeroCode-Studio HOME Activity (Main Entry Point)
@@ -64,7 +63,7 @@
             android:name=".app.ZeroCodeHomeActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|density|screenLayout|keyboard|keyboardHidden|navigation"
             android:exported="true"
-            android:label="Novus IDE"
+            android:label="@string/app_name"
             android:launchMode="singleTask"
             android:resizeableActivity="true"
             android:theme="@style/Theme.ZeroCode.Home"
@@ -76,6 +75,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- First-run setup wizard: permissions, Termux base, Linux distro, agents -->
+        <activity
+            android:name=".app.setup.SetupWizardActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|density|screenLayout|keyboard|keyboardHidden|navigation"
+            android:exported="false"
+            android:label="Setup"
+            android:resizeableActivity="true"
+            android:theme="@style/Theme.ZeroCode.Home"
+            android:windowSoftInputMode="adjustResize" />
         <!--
  ═══════════════════════════════════════════════════
              Terminal Activity (Termux Engine — No Launcher)
@@ -144,6 +152,23 @@
             android:name="com.termux.app.ProjectMapActivity"
             android:label="Project Map"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <!-- Agent GUI: chat with a CLI coding agent, and manage/install agents -->
+        <activity
+            android:name="com.termux.app.gui.AgentChatActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|density|screenLayout|keyboard|keyboardHidden|navigation"
+            android:exported="false"
+            android:label="Agent Chat"
+            android:resizeableActivity="true"
+            android:theme="@style/Theme.ZeroCode.Home"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name="com.termux.app.gui.AgentDashboardActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|density|screenLayout"
+            android:exported="false"
+            android:label="Coding Agents"
+            android:resizeableActivity="true"
+            android:theme="@style/Theme.ZeroCode.Home" />
         <activity
             android:name=".shared.activities.ReportActivity"
             android:documentLaunchMode="intoExisting"
@@ -157,6 +182,24 @@
             android:taskAffinity="${TERMUX_PACKAGE_NAME}.filereceiver"
             tools:targetApi="n" />
 
+        <activity-alias
+            android:name=".app.api.file.FileViewReceiverActivity"
+            android:exported="true"
+            android:targetActivity=".app.api.file.FileReceiverActivity">
+
+            <!-- Accept multiple file types to let Termux be usable as generic file viewer. -->
+            <intent-filter tools:ignore="AppLinkUrlError">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="application/*" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="text/*" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+        </activity-alias>
         <activity-alias
             android:name=".app.api.file.FileShareReceiverActivity"
             android:exported="true"
@@ -173,24 +216,6 @@
                 <data android:mimeType="image/*" />
                 <data android:mimeType="message/*" />
                 <data android:mimeType="multipart/*" />
-                <data android:mimeType="text/*" />
-                <data android:mimeType="video/*" />
-            </intent-filter>
-        </activity-alias>
-        <activity-alias
-            android:name=".app.api.file.FileViewReceiverActivity"
-            android:exported="true"
-            android:targetActivity=".app.api.file.FileReceiverActivity">
-
-            <!-- Accept multiple file types to let Termux be usable as generic file viewer. -->
-            <intent-filter tools:ignore="AppLinkUrlError">
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-
-                <data android:mimeType="application/*" />
-                <data android:mimeType="audio/*" />
-                <data android:mimeType="image/*" />
                 <data android:mimeType="text/*" />
                 <data android:mimeType="video/*" />
             </intent-filter>
@@ -226,9 +251,8 @@
         <receiver
             android:name=".shared.activities.ReportActivity$ReportActivityBroadcastReceiver"
             android:exported="false" />
-
         <receiver
-            android:name=".utils.UpdateReceiver"
+            android:name=".app.utils.UpdateReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />

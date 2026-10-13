@@ -11,6 +11,9 @@ release/
 .cxx
 *.zip
 
+# ObjectBox extracts its JNI library into the module directory on Windows hosts.
+app/objectbox-jni-windows-x64.dll
+
 # Local configuration file (sdk path, etc)
 local.properties
 

@@ -265,7 +265,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         
         checkAiPermissionSetup();
 
-        setToggleKeyboardView();
         setPickImageButtonView();
 
         // ZeroCode Studio: Close Terminal Button
@@ -567,7 +566,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         RecyclerView fileExplorerList = findViewById(R.id.file_explorer_list);
         if (fileExplorerList != null) {
             fileExplorerList.setLayoutManager(new LinearLayoutManager(this));
-            File defaultDir = new File("/data/data/com.termux/files/home");
+            File defaultDir = new File(TermuxConstants.TERMUX_HOME_DIR_PATH);
             if (!defaultDir.exists()) defaultDir.mkdirs();
             
             final FileExplorerAdapter[] adapterHolder = new FileExplorerAdapter[1];
@@ -649,15 +648,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
 
 
-
-    private void setToggleKeyboardView() {
-        View btnToggleKeyboard = findViewById(R.id.btn_toggle_keyboard);
-        if (btnToggleKeyboard != null) {
-            btnToggleKeyboard.setOnClickListener(v -> {
-                com.termux.shared.view.KeyboardUtils.toggleSoftKeyboard(this);
-            });
-        }
-    }
 
     private void setPickImageButtonView() {
         View btnPickImage = findViewById(R.id.btn_pick_image);
@@ -912,7 +902,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 if (in != null) {
                     String fileName = "image_" + System.currentTimeMillis() + ".jpg";
                     String workspace = getSharedPreferences("ZeroCodePrefs", Context.MODE_PRIVATE)
-                            .getString("workspace_path", "/data/data/com.termux/files/home");
+                            .getString("workspace_path", TermuxConstants.TERMUX_HOME_DIR_PATH);
                     java.io.File destFile = new java.io.File(workspace, fileName);
                     java.io.FileOutputStream out = new java.io.FileOutputStream(destFile);
                     byte[] buffer = new byte[4096];

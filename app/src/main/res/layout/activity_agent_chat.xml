@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Agent Chat GUI: pick a CLI agent, type a prompt, watch its output as chat.
+  The agent itself still runs as a normal background process (AgentRunner).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root_agent_chat"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/zc_chat_bg"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <!-- Top bar -->
+    <LinearLayout
+        android:id="@+id/top_bar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/zc_bg_surface"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp">
+
+        <ImageButton
+            android:id="@+id/btn_chat_back"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Back"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="@color/zc_text_primary" />
+
+        <Spinner
+            android:id="@+id/chat_agent_spinner"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_ai_spinner"
+            android:paddingHorizontal="12dp"
+            android:popupBackground="@color/zc_bg_dark"
+            android:spinnerMode="dropdown" />
+
+        <ImageButton
+            android:id="@+id/btn_chat_history"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Chat sessions history"
+            android:src="@drawable/ic_history"
+            app:tint="@color/zc_text_secondary" />
+
+        <ImageButton
+            android:id="@+id/btn_chat_new"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="New chat session"
+            android:src="@drawable/ic_new_session"
+            app:tint="@color/zc_text_secondary" />
+
+        <ImageButton
+            android:id="@+id/btn_chat_dashboard"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Manage agents"
+            android:src="@drawable/ic_settings"
+            app:tint="@color/zc_text_secondary" />
+
+        <ImageButton
+            android:id="@+id/btn_chat_terminal"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Open in terminal"
+            android:src="@drawable/ic_terminal"
+            app:tint="@color/zc_text_secondary" />
+    </LinearLayout>
+
+    <!-- Model & Thinking configuration strip -->
+    <LinearLayout
+        android:id="@+id/strip_model_thinking"
+        android:layout_width="match_parent"
+        android:layout_height="34dp"
+        android:background="#12121C"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp">
+
+        <!-- Model selection chip -->
+        <LinearLayout
+            android:id="@+id/btn_select_model"
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:background="@drawable/bg_chip_tag"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🤖 "
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tv_current_model"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="claude-3-7-sonnet"
+                android:textColor="#58A6FF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:text="▾"
+                android:textColor="@color/zc_text_muted"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Thinking level chip -->
+        <LinearLayout
+            android:id="@+id/btn_select_thinking"
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_chip_tag"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🧠 "
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tv_current_thinking"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Thinking: High"
+                android:textColor="#BC8CFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:text="▾"
+                android:textColor="@color/zc_text_muted"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Live Connection & Thinking status text -->
+        <TextView
+            android:id="@+id/tv_strip_live_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚡ Ready"
+            android:textColor="#7EE787"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/zc_border" />
+
+    <!-- Chat transcript -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_chat"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingHorizontal="4dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:scrollbars="vertical" />
+
+    <!-- "Agent is running" strip with a stop button -->
+    <LinearLayout
+        android:id="@+id/row_running"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:background="@color/zc_bg_surface"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:id="@+id/progress_running"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:indeterminateTint="@color/zc_red_primary" />
+
+        <TextView
+            android:id="@+id/tv_running_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:text="Agent is working…"
+            android:textColor="@color/zc_text_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/btn_chat_stop"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:background="@drawable/bg_red_button"
+            android:gravity="center"
+            android:paddingHorizontal="14dp"
+            android:text="Stop"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Compact Floating Slash Commands Suggestions Card -->
+    <LinearLayout
+        android:id="@+id/card_slash_suggestions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_slash_suggestions"
+        android:elevation="6dp"
+        android:layout_marginHorizontal="10dp"
+        android:layout_marginBottom="4dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone">
+
+        <!-- Header: agent command title & close button -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:id="@+id/tv_slash_panel_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="⚡ Slash Commands"
+                android:textColor="#58A6FF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/btn_close_slash_panel"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_close_small"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Close"
+                android:padding="2dp"
+                app:tint="@color/zc_text_muted" />
+        </LinearLayout>
+
+        <!-- Compact ListView with max 160dp height -->
+        <ListView
+            android:id="@+id/list_slash_suggestions"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
+            android:divider="@color/zc_border"
+            android:dividerHeight="0.5dp"
+            android:scrollbars="vertical" />
+    </LinearLayout>
+
+    <!-- Prompt input & attachments bar -->
+    <LinearLayout
+        android:id="@+id/bottom_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/zc_bg_surface"
+        android:orientation="vertical"
+        android:paddingHorizontal="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="8dp">
+
+        <!-- Attachment chips row (Visible when images or files are attached) -->
+        <HorizontalScrollView
+            android:id="@+id/scroll_attachments"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/container_attachments"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <LinearLayout
+            android:id="@+id/row_input_fields"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/btn_chat_slash"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Slash commands"
+                android:padding="8dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_slash"
+                app:tint="@color/zc_text_secondary" />
+
+            <ImageButton
+                android:id="@+id/btn_chat_photo"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Send photo"
+                android:padding="8dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_image"
+                app:tint="@color/zc_text_secondary" />
+
+            <ImageButton
+                android:id="@+id/btn_chat_attach"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="6dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Tag file or photo"
+                android:padding="8dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_attach"
+                app:tint="@color/zc_text_secondary" />
+
+            <EditText
+                android:id="@+id/et_chat_prompt"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/bg_chat_input_pill"
+                android:gravity="center_vertical"
+                android:hint="Ask agent, / commands, @ tags…"
+                android:imeOptions="actionSend"
+                android:inputType="textMultiLine|textCapSentences|textNoSuggestions"
+                android:maxLines="5"
+                android:minHeight="44dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="10dp"
+                android:scrollbars="vertical"
+                android:textColor="@color/zc_text_primary"
+                android:textColorHint="@color/zc_text_muted"
+                android:textSize="14sp" />
+
+            <ImageButton
+                android:id="@+id/btn_chat_send"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_chat_send_btn"
+                android:contentDescription="Send"
+                android:scaleType="centerInside"
+                android:src="@android:drawable/ic_menu_send"
+                app:tint="#FFFFFF" />
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

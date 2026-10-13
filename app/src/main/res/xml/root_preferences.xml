@@ -14,6 +14,11 @@
         app:title="@string/sync_workshop_title"
         app:summary="@string/sync_workshop_summary"/>
 
+    <Preference
+        app:key="setup_wizard"
+        app:title="@string/setup_wizard_title"
+        app:summary="@string/setup_wizard_summary"/>
+
     <SwitchPreference
         app:key="auto_ai_debug"
         app:title="@string/auto_ai_debug_title"

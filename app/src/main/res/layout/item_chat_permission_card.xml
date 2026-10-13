@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
+
+    <!-- The IDE Card Container -->
+    <LinearLayout
+        android:id="@+id/card_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_card_permission"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <!-- Top Header: Icon + Title + Status Pill -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/perm_icon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:gravity="center"
+                android:text="📝"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/perm_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="middle"
+                android:fontFamily="sans-serif-medium"
+                android:singleLine="true"
+                android:text="Agent wants to edit file"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+
+            <!-- Status Pill -->
+            <TextView
+                android:id="@+id/perm_status_pill"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_pill_pending"
+                android:paddingStart="8dp"
+                android:paddingTop="3dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="3dp"
+                android:text="⏳ Pending"
+                android:textColor="#D29922"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Subtitle / Meta / Description -->
+        <TextView
+            android:id="@+id/perm_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Action: edit_file"
+            android:textColor="#8B949E"
+            android:textSize="11sp" />
+
+        <!-- Snippet / Diff Preview Box -->
+        <TextView
+            android:id="@+id/perm_preview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#0A0C10"
+            android:fontFamily="monospace"
+            android:maxLines="5"
+            android:padding="8dp"
+            android:text="Target: CLIAgentManager.java"
+            android:textColor="#C9D1D9"
+            android:textSize="11sp" />
+
+        <!-- Decision Message (Shown after Allow / Reject) -->
+        <TextView
+            android:id="@+id/perm_decision_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="✅ Allowed by you"
+            android:textColor="#3FB950"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <!-- Actions Row: View Diff | Reject | Allow -->
+        <LinearLayout
+            android:id="@+id/perm_actions_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_perm_diff"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_btn_diff"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:text="📄 View Diff"
+                android:textAllCaps="false"
+                android:textColor="#C9D1D9"
+                android:textSize="11sp" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <Button
+                android:id="@+id/btn_perm_reject"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_btn_reject"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:text="❌ Reject"
+                android:textAllCaps="false"
+                android:textColor="#FF7B72"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btn_perm_allow"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_btn_allow"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="✅ Allow"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

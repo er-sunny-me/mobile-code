@@ -62,13 +62,13 @@ android {
         buildConfigField "String", "TERMUX_PACKAGE_VARIANT", "\"" + project.ext.packageVariant + "\"" // Used by TermuxApplication class
 
         manifestPlaceholders.TERMUX_PACKAGE_NAME = "com.termux"
-        manifestPlaceholders.TERMUX_APP_NAME = "ZeroCode-Studio"
-        manifestPlaceholders.TERMUX_API_APP_NAME = "ZeroCode:API"
-        manifestPlaceholders.TERMUX_BOOT_APP_NAME = "ZeroCode:Boot"
-        manifestPlaceholders.TERMUX_FLOAT_APP_NAME = "ZeroCode:Float"
-        manifestPlaceholders.TERMUX_STYLING_APP_NAME = "ZeroCode:Styling"
-        manifestPlaceholders.TERMUX_TASKER_APP_NAME = "ZeroCode:Tasker"
-        manifestPlaceholders.TERMUX_WIDGET_APP_NAME = "ZeroCode:Widget"
+        manifestPlaceholders.TERMUX_APP_NAME = "Mobile Code"
+        manifestPlaceholders.TERMUX_API_APP_NAME = "Mobile Code:API"
+        manifestPlaceholders.TERMUX_BOOT_APP_NAME = "Mobile Code:Boot"
+        manifestPlaceholders.TERMUX_FLOAT_APP_NAME = "Mobile Code:Float"
+        manifestPlaceholders.TERMUX_STYLING_APP_NAME = "Mobile Code:Styling"
+        manifestPlaceholders.TERMUX_TASKER_APP_NAME = "Mobile Code:Tasker"
+        manifestPlaceholders.TERMUX_WIDGET_APP_NAME = "Mobile Code:Widget"
 
         externalNativeBuild {
             ndkBuild {
@@ -146,14 +146,20 @@ android {
         }
     }
 
+    // Compressed bundle files use the neutral .tar.bin suffix: AAPT2 gunzips
+    // anything ending in .gz and strips the suffix (59MB -> 195MB in-APK).
+    aaptOptions {
+        noCompress 'bin', 'zip'
+    }
+
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
             def version = variant.versionName
             def abi = output.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
             if (variant.buildType.name == "debug") {
-                outputFileName = new File("Novus-IDE-v" + version + "-debug_" + abi + ".apk")
+                outputFileName = new File("MobileCode-v" + version + "-debug_" + abi + ".apk")
             } else if (variant.buildType.name == "release") {
-                outputFileName = new File("Novus-IDE-v" + version + "-release_" + abi + ".apk")
+                outputFileName = new File("MobileCode-v" + version + "-release_" + abi + ".apk")
             }
         }
     }
@@ -187,7 +193,7 @@ dependencies {
 }
 
 jacoco {
-    toolVersion = "0.8.8"
+    toolVersion = "0.8.12"
 }
 
 task versionName {
@@ -251,6 +257,248 @@ clean {
         def tree = fileTree(new File(projectDir, 'src/main/cpp'))
         tree.include 'bootstrap-*.zip'
         tree.each { it.delete() }
+    }
+}
+
+// ------------------------------------------------------------------
+// Workshop bundle: Ubuntu rootfs + CLI agent binaries packed into the APK
+// (app/src/main/assets/workshop/) so first-run setup is fast/offline.
+// Ubuntu stays bundled always; agents are bundled for testing builds.
+// Opt-out:  -PbundleWorkshop=0  (no rootfs)  -PbundleAgents=0 (no agents)
+//           -PbundleBigAgents=0 (skip grok ~160MB + kiro ~157MB)
+// The whole directory is git-ignored; the task re-downloads when missing.
+// Failures are loud warnings, never build breakers: the setup wizard falls
+// back to network install when a bundled file is absent.
+// ------------------------------------------------------------------
+ext {
+    bundleWorkshop = (findProperty("bundleWorkshop") ?: "1") != "0"
+    bundleAgents = (findProperty("bundleAgents") ?: "1") != "0"
+    bundleBigAgents = (findProperty("bundleBigAgents") ?: "1") != "0"
+}
+
+def sha256Hex(File file) {
+    def digest = java.security.MessageDigest.getInstance("SHA-256")
+    def buffer = new byte[1048576]
+    new FileInputStream(file).withStream { input ->
+        while (true) {
+            def readBytes = input.read(buffer)
+            if (readBytes < 0) break
+            digest.update(buffer, 0, readBytes)
+        }
+    }
+    def hex = new BigInteger(1, digest.digest()).toString(16)
+    while (hex.length() < 64) { hex = "0" + hex }
+    return hex
+}
+
+def sha512Hex(File file) {
+    def digest = java.security.MessageDigest.getInstance("SHA-512")
+    def buffer = new byte[1048576]
+    new FileInputStream(file).withStream { input ->
+        while (true) {
+            def readBytes = input.read(buffer)
+            if (readBytes < 0) break
+            digest.update(buffer, 0, readBytes)
+        }
+    }
+    def hex = new BigInteger(1, digest.digest()).toString(16)
+    while (hex.length() < 128) { hex = "0" + hex }
+    return hex
+}
+
+/** Download url -> dest, resume-friendly. Returns false on any error. */
+def fetchUrl(String url, File dest) {
+    try {
+        dest.parentFile.mkdirs()
+        def connection = new URL(url).openConnection()
+        connection.setInstanceFollowRedirects(true)
+        connection.setConnectTimeout(30000)
+        connection.setReadTimeout(120000)
+        connection.setRequestProperty("User-Agent", "MobileCode-Workshop-Bundle/1.0")
+        connection.inputStream.withStream { input ->
+            new BufferedOutputStream(new FileOutputStream(dest)).withStream { out ->
+                out << input
+            }
+        }
+        return true
+    } catch (Exception e) {
+        logger.warn("Workshop bundle: download failed for " + url + ": " + e.getMessage())
+        try { dest.delete() } catch (Exception ignored) {}
+        return false
+    }
+}
+
+task downloadWorkshopBundle() {
+    doLast {
+        if (!project.ext.bundleWorkshop && !project.ext.bundleAgents) {
+            logger.lifecycle("Workshop bundle: disabled via properties, skipping.")
+            return
+        }
+        def assetsDir = new File(projectDir, "src/main/assets/workshop")
+        def manifest = new Properties()
+        def manifestFile = new File(assetsDir, "bundle.properties")
+        if (manifestFile.exists()) {
+            manifestFile.withInputStream { manifest.load(it) }
+        }
+        def changed = false
+        def need = { String key, File file, String recordedSha ->
+            return !(file.exists() && recordedSha != null && sha256Hex(file) == recordedSha)
+        }
+
+        // ---- Ubuntu rootfs (always bundled) ----
+        if (project.ext.bundleWorkshop) {
+            def ubuntuRelease = "24.04.5"
+            // arm64 = phones, x86_64 = emulator. Entries pin exact upstream files.
+            def rootfsSpecs = [
+                [arch: "arm64", file: "ubuntu-base-24.04.5-base-arm64.tar.gz"],
+                [arch: "x86_64", file: "ubuntu-base-24.04.5-base-amd64.tar.gz"]
+            ]
+            for (spec in rootfsSpecs) {
+                def key = "rootfs.ubuntu." + spec.arch
+                def dest = new File(assetsDir, "rootfs/ubuntu-" + spec.arch + ".tar.bin")
+                def recorded = manifest.getProperty(key + ".sha256")
+                if (need(key, dest, recorded)) {
+                    def url = "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/" + spec.file
+                    logger.lifecycle("Workshop bundle: downloading Ubuntu " + spec.arch + " rootfs (~29MB) ...")
+                    if (fetchUrl(url, dest)) {
+                        manifest.setProperty(key + ".file", "rootfs/ubuntu-" + spec.arch + ".tar.bin")
+                        manifest.setProperty(key + ".sha256", sha256Hex(dest))
+                        manifest.setProperty(key + ".size", String.valueOf(dest.length()))
+                        manifest.setProperty(key + ".version", ubuntuRelease)
+                        manifest.setProperty(key + ".url", url)
+                        changed = true
+                    } else {
+                        logger.warn("Workshop bundle: Ubuntu " + spec.arch + " MISSING — setup will download it on-device.")
+                    }
+                }
+            }
+        }
+
+        // ---- CLI agent binaries (testing bundle) ----
+        if (project.ext.bundleAgents) {
+            // Antigravity: version-pinned manifest with sha512.
+            try {
+                def agyKey = "agent.agy.arm64"
+                def agyDest = new File(assetsDir, "agents/arm64/agy.tar.bin")
+                def agyRecorded = manifest.getProperty(agyKey + ".sha256")
+                if (need(agyKey, agyDest, agyRecorded)) {
+                    logger.lifecycle("Workshop bundle: resolving Antigravity manifest ...")
+                    def agyManifest = new groovy.json.JsonSlurper().parse(
+                        new URL("https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/linux_arm64.json"))
+                    logger.lifecycle("Workshop bundle: downloading agy " + agyManifest.version + " (~59MB) ...")
+                    if (fetchUrl(agyManifest.url.toString(), agyDest)) {
+                        def actual512 = sha512Hex(agyDest)
+                        if (actual512.equalsIgnoreCase(agyManifest.sha512.toString())) {
+                            manifest.setProperty(agyKey + ".file", "agents/arm64/agy.tar.bin")
+                            manifest.setProperty(agyKey + ".sha256", sha256Hex(agyDest))
+                            manifest.setProperty(agyKey + ".size", String.valueOf(agyDest.length()))
+                            manifest.setProperty(agyKey + ".version", agyManifest.version.toString())
+                            manifest.setProperty(agyKey + ".url", agyManifest.url.toString())
+                            manifest.setProperty(agyKey + ".inner", "antigravity")
+                            manifest.setProperty(agyKey + ".target", ".local/bin/agy")
+                            changed = true
+                        } else {
+                            logger.warn("Workshop bundle: agy sha512 MISMATCH — discarding.")
+                            agyDest.delete()
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Workshop bundle: agy skipped: " + e.getMessage())
+            }
+
+            // OpenCode: single-binary tarball from GitHub releases.
+            try {
+                def ocKey = "agent.opencode.arm64"
+                def ocDest = new File(assetsDir, "agents/arm64/opencode.tar.bin")
+                def ocRecorded = manifest.getProperty(ocKey + ".sha256")
+                if (need(ocKey, ocDest, ocRecorded)) {
+                    def ocUrl = "https://github.com/sst/opencode/releases/latest/download/opencode-linux-arm64.tar.gz"
+                    logger.lifecycle("Workshop bundle: downloading opencode (~25MB) ...")
+                    if (fetchUrl(ocUrl, ocDest)) {
+                            manifest.setProperty(ocKey + ".file", "agents/arm64/opencode.tar.bin")
+                        manifest.setProperty(ocKey + ".sha256", sha256Hex(ocDest))
+                        manifest.setProperty(ocKey + ".size", String.valueOf(ocDest.length()))
+                        manifest.setProperty(ocKey + ".url", ocUrl)
+                        manifest.setProperty(ocKey + ".inner", "opencode")
+                        manifest.setProperty(ocKey + ".target", ".opencode/bin/opencode")
+                        changed = true
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Workshop bundle: opencode skipped: " + e.getMessage())
+            }
+
+            if (project.ext.bundleBigAgents) {
+                // Grok: raw ~160MB binary. Version pointer is plain text.
+                try {
+                    def grokKey = "agent.grok.arm64"
+                    def grokDest = new File(assetsDir, "agents/arm64/grok.bin")
+                    def grokRecorded = manifest.getProperty(grokKey + ".sha256")
+                    if (need(grokKey, grokDest, grokRecorded)) {
+                        def grokVersion = new URL("https://x.ai/cli/stable").getText("UTF-8").trim()
+                        def grokUrl = "https://x.ai/cli/grok-" + grokVersion + "-linux-aarch64"
+                        logger.lifecycle("Workshop bundle: downloading grok " + grokVersion + " (~160MB) ...")
+                        if (fetchUrl(grokUrl, grokDest)) {
+                            manifest.setProperty(grokKey + ".file", "agents/arm64/grok.bin")
+                            manifest.setProperty(grokKey + ".sha256", sha256Hex(grokDest))
+                            manifest.setProperty(grokKey + ".size", String.valueOf(grokDest.length()))
+                            manifest.setProperty(grokKey + ".version", grokVersion)
+                            manifest.setProperty(grokKey + ".url", grokUrl)
+                            manifest.setProperty(grokKey + ".target", ".grok/downloads/grok-linux-aarch64")
+                            changed = true
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Workshop bundle: grok skipped: " + e.getMessage())
+                }
+
+                // Kiro: ~157MB zip, installed via its inner kirocli/install.sh.
+                try {
+                    def kiroKey = "agent.kiro.arm64"
+                    def kiroDest = new File(assetsDir, "agents/arm64/kiro.zip")
+                    def kiroRecorded = manifest.getProperty(kiroKey + ".sha256")
+                    if (need(kiroKey, kiroDest, kiroRecorded)) {
+                        def kiroUrl = "https://prod.download.cli.kiro.dev/stable/latest/kirocli-aarch64-linux.zip"
+                        logger.lifecycle("Workshop bundle: downloading kiro-cli (~157MB) ...")
+                        if (fetchUrl(kiroUrl, kiroDest)) {
+                            manifest.setProperty(kiroKey + ".file", "agents/arm64/kiro.zip")
+                            manifest.setProperty(kiroKey + ".sha256", sha256Hex(kiroDest))
+                            manifest.setProperty(kiroKey + ".size", String.valueOf(kiroDest.length()))
+                            manifest.setProperty(kiroKey + ".url", kiroUrl)
+                            manifest.setProperty(kiroKey + ".target", ".local/bin/kiro-cli")
+                            changed = true
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Workshop bundle: kiro skipped: " + e.getMessage())
+                }
+            } else {
+                logger.lifecycle("Workshop bundle: big agents (grok, kiro) skipped via bundleBigAgents=0.")
+            }
+        }
+
+        manifest.setProperty("bundle.version", "1")
+        manifestFile.parentFile.mkdirs()
+        manifestFile.withOutputStream { manifest.store(it, "Mobile Code workshop bundle — generated, do not edit") }
+        if (changed) logger.lifecycle("Workshop bundle: manifest updated.")
+        def total = 0L
+        assetsDir.eachFileRecurse { if (it.isFile() && it.name != "bundle.properties") total += it.length() }
+        logger.lifecycle(String.format("Workshop bundle: %.1f MB in %s", total / 1048576.0, assetsDir))
+    }
+}
+
+afterEvaluate {
+    android.applicationVariants.all { variant ->
+        variant.javaCompileProvider.get().dependsOn(downloadBootstraps)
+        if (project.ext.bundleWorkshop || project.ext.bundleAgents) {
+            try {
+                variant.mergeAssetsProvider.get().dependsOn(downloadWorkshopBundle)
+            } catch (Exception ignored) {
+                // Older AGP without mergeAssetsProvider — assets still merge, just
+                // run ./gradlew downloadWorkshopBundle manually before assembling.
+            }
+        }
     }
 }
 

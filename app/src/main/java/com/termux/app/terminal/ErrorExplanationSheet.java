@@ -51,8 +51,12 @@ public class ErrorExplanationSheet extends BottomSheetDialog {
         new Thread(() -> {
             String prompt = buildErrorPrompt(error, openFileContent);
             String fullResponse = callAI(prompt);
-            
+
+            // The activity may have gone away while the request was in flight.
+            if (activity.isFinishing() || activity.isDestroyed()) return;
+
             activity.runOnUiThread(() -> {
+                if (activity.isFinishing() || activity.isDestroyed()) return;
                 progressBar.setVisibility(View.GONE);
                 tvResponse.setText(fullResponse);
                 
@@ -73,7 +77,7 @@ public class ErrorExplanationSheet extends BottomSheetDialog {
 
     private String buildErrorPrompt(ErrorDetector.DetectedError error, String fileContent) {
         StringBuilder sb = new StringBuilder();
-        sb.append("You are an expert debugging assistant in Novus IDE (Android terminal IDE).\n\n");
+        sb.append("You are an expert debugging assistant in Mobile Code (Android terminal IDE).\n\n");
         sb.append("## Error Detected\n");
         sb.append("Type: ").append(error.type).append("\n");
         if (error.command != null) sb.append("Command run: `").append(error.command).append("`\n");

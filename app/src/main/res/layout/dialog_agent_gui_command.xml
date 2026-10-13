@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Edit the non-interactive command used by the GUI chat for one agent. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/tv_cmd_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="GUI command"
+        android:textColor="@color/zc_text_primary"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="This is the command the Agent Chat screen runs. Use {prompt} where the prompt should be inserted. It must run the agent non-interactively and print to stdout."
+        android:textColor="@color/zc_text_secondary"
+        android:textSize="12sp" />
+
+    <EditText
+        android:id="@+id/et_cmd_value"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_chat_input_pill"
+        android:fontFamily="monospace"
+        android:hint="agent -p &quot;{prompt}&quot;"
+        android:inputType="textNoSuggestions"
+        android:padding="14dp"
+        android:textColor="@color/zc_text_primary"
+        android:textColorHint="@color/zc_text_muted"
+        android:textSize="13sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Leave empty to always open this agent in the terminal instead."
+        android:textColor="@color/zc_text_muted"
+        android:textSize="11sp" />
+
+</LinearLayout>
