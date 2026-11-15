@@ -103,7 +103,7 @@ public class UpdateChecker {
     private static void startDownload(Context context, String downloadUrl, String version) {
         try {
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
-            request.setTitle("Mobile Code Update");
+            request.setTitle("Xyz.IDE Update");
             request.setDescription("Downloading version " + version);
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "MobileCode-" + version + ".apk");
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);

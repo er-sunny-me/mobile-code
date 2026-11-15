@@ -46,6 +46,13 @@ public class AgentRunner {
     private OutputStream processStdin;
     private Thread readerThread;
     private volatile boolean cancelled;
+    /**
+     * Incremented on every run() and cancel(). Reader threads capture the generation
+     * they belong to and drop their callbacks once it no longer matches, so output or
+     * a finish event from a stopped/replaced run can never bleed into the next run's
+     * chat (the listener is activity-scoped and shared by all runs).
+     */
+    private volatile int runGeneration = 0;
     private Environment lastEnvironment = Environment.TERMUX;
 
     public boolean isRunning() {
@@ -104,6 +111,7 @@ public class AgentRunner {
      */
     public void run(String cwd, String command, Listener listener) {
         cancel();
+        final int generation = ++runGeneration;
 
         String bash = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/bash";
         if (!new File(bash).exists()) {
@@ -144,7 +152,9 @@ public class AgentRunner {
             return;
         }
 
-        main.post(() -> listener.onStarted(effectiveCommand));
+        main.post(() -> {
+            if (generation == runGeneration) listener.onStarted(effectiveCommand);
+        });
 
         final Process started = process;
         readerThread = new Thread(() -> {
@@ -153,14 +163,20 @@ public class AgentRunner {
                 String line;
                 while ((line = br.readLine()) != null) {
                     final String out = line;
-                    if (!cancelled) {
-                        main.post(() -> listener.onOutput(out));
+                    if (!cancelled && generation == runGeneration) {
+                        main.post(() -> {
+                            if (generation == runGeneration) listener.onOutput(out);
+                        });
                     }
                 }
             } catch (Exception e) {
-                if (!cancelled) {
+                if (!cancelled && generation == runGeneration) {
                     final String msg = e.getMessage();
-                    main.post(() -> listener.onOutput("[stream closed: " + msg + "]"));
+                    main.post(() -> {
+                        if (generation == runGeneration) {
+                            listener.onOutput("[stream closed: " + msg + "]");
+                        }
+                    });
                 }
             }
 
@@ -183,8 +199,10 @@ public class AgentRunner {
             }
 
             final int code = exit;
-            if (!cancelled) {
-                main.post(() -> listener.onFinished(code));
+            if (!cancelled && generation == runGeneration) {
+                main.post(() -> {
+                    if (generation == runGeneration) listener.onFinished(code);
+                });
             }
         }, "agent-runner");
         readerThread.setDaemon(true);
@@ -194,6 +212,7 @@ public class AgentRunner {
     /** Kill the running agent, if any. Safe to call repeatedly. */
     public synchronized void cancel() {
         cancelled = true;
+        runGeneration++;
         if (processStdin != null) {
             try {
                 processStdin.close();

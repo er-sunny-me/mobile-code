@@ -175,8 +175,8 @@ public class AgentDashboardActivity extends AppCompatActivity implements AgentLi
         // Open the agent's TUI in the Ubuntu workshop (same env it was installed in).
         android.content.Intent intent =
                 new android.content.Intent(this, com.termux.app.TermuxActivity.class);
-        intent.putExtra("com.termux.execute.cwd", workspacePath());
-        intent.putExtra("com.termux.execute.command",
+        intent.putExtra("com.xyzide.execute.cwd", workspacePath());
+        intent.putExtra("com.xyzide.execute.command",
                 agentManager.buildLoginCommand(agent, workspacePath()));
         startActivity(intent);
         Toast.makeText(this,

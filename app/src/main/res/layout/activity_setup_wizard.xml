@@ -13,7 +13,7 @@
         android:layout_height="wrap_content"
         android:paddingHorizontal="20dp"
         android:paddingTop="24dp"
-        android:text="Welcome to Mobile Code"
+        android:text="Welcome to Xyz.IDE"
         android:textColor="@color/zc_text_white"
         android:textSize="22sp"
         android:textStyle="bold" />

@@ -40,3 +40,6 @@ local.properties
 .swp
 ehthumbs.db
 Thumbs.db
+
+# Xyz.IDE: patched bootstrap zips are part of the build (see scripts/patch-bootstrap.py)
+!app/src/main/cpp/bootstrap-*.zip

@@ -278,7 +278,7 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
     private void launchTerminal() {
         Intent intent = new Intent(this, TermuxActivity.class);
         if (workspaceDir != null && workspaceDir.exists()) {
-            intent.putExtra("com.termux.execute.cwd", workspaceDir.getAbsolutePath());
+            intent.putExtra("com.xyzide.execute.cwd", workspaceDir.getAbsolutePath());
         }
         startActivity(intent);
         overridePendingTransition(R.anim.slide_up, R.anim.stay);
@@ -419,8 +419,8 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
         saveCurrentFile();
         
         Intent intent = new Intent(this, TermuxActivity.class);
-        intent.putExtra("com.termux.execute.cwd", currentEditingFile.getParent());
-        intent.putExtra("com.termux.execute.file_to_run", currentEditingFile.getAbsolutePath());
+        intent.putExtra("com.xyzide.execute.cwd", currentEditingFile.getParent());
+        intent.putExtra("com.xyzide.execute.file_to_run", currentEditingFile.getAbsolutePath());
         startActivity(intent);
         overridePendingTransition(R.anim.slide_up, R.anim.stay);
     }

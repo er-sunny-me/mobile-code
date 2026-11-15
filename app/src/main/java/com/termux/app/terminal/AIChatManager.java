@@ -10,6 +10,7 @@ import android.widget.Spinner;
 
 import com.termux.R;
 import com.termux.app.TermuxActivity;
+import com.termux.shared.termux.TermuxConstants;
 import com.termux.terminal.TerminalSession;
 
 public class AIChatManager {
@@ -97,7 +98,7 @@ public class AIChatManager {
                 TerminalSession currentSession = activity.getCurrentSession();
                 if (currentSession != null) {
                     String workspace = activity.getSharedPreferences("ZeroCodePrefs", Context.MODE_PRIVATE)
-                            .getString("workspace_path", "/data/data/com.termux/files/home");
+                            .getString("workspace_path", TermuxConstants.TERMUX_HOME_DIR_PATH);
                     String cmd = cliAgentManager.buildLaunchCommand(agent, "", workspace);
                     
                     if (isInitial) {

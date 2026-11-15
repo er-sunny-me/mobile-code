@@ -100,7 +100,7 @@ public class CLIAgentManager {
             "Antigravity CLI",
             "Google DeepMind's advanced agentic coding assistant.",
             "agy",
-            "if ! command -v agy &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://antigravity.google/cli/install.sh | bash; grep -qF '$HOME/.local/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc; fi; export PATH=\"$HOME/.local/bin:/data/data/com.termux/files/home/.local/bin:/root/.local/bin:$PATH\"; hash -r 2>/dev/null || true; command -v agy && agy --version || echo 'NOTE: installed but not on PATH yet — restart the terminal (exec $SHELL -l) or run: export PATH=\"$HOME/.local/bin:$PATH\"'",
+            "if ! command -v agy &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://antigravity.google/cli/install.sh | bash; grep -qF '$HOME/.local/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc; fi; export PATH=\"$HOME/.local/bin:" + TermuxConstants.TERMUX_HOME_DIR_PATH + "/.local/bin:/root/.local/bin:$PATH\"; hash -r 2>/dev/null || true; command -v agy && agy --version || echo 'NOTE: installed but not on PATH yet — restart the terminal (exec $SHELL -l) or run: export PATH=\"$HOME/.local/bin:$PATH\"'",
             "export PATH=\"$HOME/.local/bin:$PATH\" && agy",
             "export PATH=\"$HOME/.local/bin:$PATH\" && agy -p \"{prompt}\"",
             "🔵"
@@ -140,7 +140,7 @@ public class CLIAgentManager {
             "OpenCode CLI",
             "Extensible Go-based AI coding TUI with plugins.",
             "opencode",
-            "if ! command -v opencode &> /dev/null && [ ! -x \"$HOME/.opencode/bin/opencode\" ]; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://opencode.ai/install | bash; grep -qF '$HOME/.opencode/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.opencode/bin:$PATH\"' >> ~/.bashrc; fi; export PATH=\"$HOME/.opencode/bin:/data/data/com.termux/files/home/.opencode/bin:/root/.opencode/bin:$PATH\"; hash -r 2>/dev/null || true; command -v opencode && opencode --version || { [ -x \"$HOME/.opencode/bin/opencode\" ] && \"$HOME/.opencode/bin/opencode\" --version || echo 'NOTE: installed but not on PATH yet — restart the terminal (exec $SHELL -l) or run: export PATH=\"$HOME/.opencode/bin:$PATH\"'; }",
+            "if ! command -v opencode &> /dev/null && [ ! -x \"$HOME/.opencode/bin/opencode\" ]; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://opencode.ai/install | bash; grep -qF '$HOME/.opencode/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.opencode/bin:$PATH\"' >> ~/.bashrc; fi; export PATH=\"$HOME/.opencode/bin:" + TermuxConstants.TERMUX_HOME_DIR_PATH + "/.opencode/bin:/root/.opencode/bin:$PATH\"; hash -r 2>/dev/null || true; command -v opencode && opencode --version || { [ -x \"$HOME/.opencode/bin/opencode\" ] && \"$HOME/.opencode/bin/opencode\" --version || echo 'NOTE: installed but not on PATH yet — restart the terminal (exec $SHELL -l) or run: export PATH=\"$HOME/.opencode/bin:$PATH\"'; }",
             "export PATH=\"$HOME/.opencode/bin:$PATH\" && opencode",
             "export PATH=\"$HOME/.opencode/bin:$PATH\" && opencode run \"{prompt}\"",
             "🟡"
@@ -252,14 +252,14 @@ public class CLIAgentManager {
     /** Shell script printing one {@code binary=path} line per detected agent binary. */
     static String buildProbeScript(String names) {
         String binDirs = "\"$HOME/.local/bin\" \"$HOME/.opencode/bin\" \"$HOME/.grok/bin\""
-                + " \"/data/data/com.termux/files/home/.local/bin\""
-                + " \"/data/data/com.termux/files/home/.opencode/bin\""
-                + " \"/data/data/com.termux/files/home/.grok/bin\""
+                + " \"" + TermuxConstants.TERMUX_HOME_DIR_PATH + "/.local/bin\""
+                + " \"" + TermuxConstants.TERMUX_HOME_DIR_PATH + "/.opencode/bin\""
+                + " \"" + TermuxConstants.TERMUX_HOME_DIR_PATH + "/.grok/bin\""
                 + " \"/root/.local/bin\" \"/root/.opencode/bin\" \"/root/.grok/bin\"";
         return "export PATH=\"$HOME/.local/bin:$HOME/.opencode/bin:$HOME/.grok/bin"
-                + ":/data/data/com.termux/files/home/.local/bin"
-                + ":/data/data/com.termux/files/home/.opencode/bin"
-                + ":/data/data/com.termux/files/home/.grok/bin"
+                + ":" + TermuxConstants.TERMUX_HOME_DIR_PATH + "/.local/bin"
+                + ":" + TermuxConstants.TERMUX_HOME_DIR_PATH + "/.opencode/bin"
+                + ":" + TermuxConstants.TERMUX_HOME_DIR_PATH + "/.grok/bin"
                 + ":/root/.local/bin:/root/.opencode/bin:/root/.grok/bin:$PATH\" 2>/dev/null || true;"
                 + " for b in " + names + "; do"
                 + " p=$(command -v \"$b\" 2>/dev/null);"
@@ -908,11 +908,11 @@ public class CLIAgentManager {
      */
     public static String shellPrelude() {
         String cert = TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/etc/tls/cert.pem";
-        String termuxHomeBin = "/data/data/com.termux/files/home";
+        String termuxHomeBin = TermuxConstants.TERMUX_HOME_DIR_PATH;
         String termuxOpen = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/termux-open-url";
         String shimBody = "#!/bin/bash\n"
                 + "url=\"$1\"\n"
-                + "for opener in \"" + termuxOpen + "\" \"/data/data/com.termux/files/usr/bin/termux-open-url\" termux-open-url termux-open; do\n"
+                + "for opener in \"" + termuxOpen + "\" \"" + TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/bin/termux-open-url\" termux-open-url termux-open; do\n"
                 + "  if command -v \"$opener\" >/dev/null 2>&1; then \"$opener\" \"$url\" >/dev/null 2>&1 & exit 0; fi\n"
                 + "done\n"
                 + "echo \"Open this URL on your phone browser: $url\"\n"
@@ -1208,7 +1208,7 @@ public class CLIAgentManager {
             cmd = anthropicExports() + cmd;
         }
         if (agent.id.equals("antigravity")) {
-            cmd = cmd + " ; echo ''; echo '[Mobile Code] If no browser opened, copy the URL above into your phone browser, sign in, and paste the code back here.'";
+            cmd = cmd + " ; echo ''; echo '[Xyz.IDE] If no browser opened, copy the URL above into your phone browser, sign in, and paste the code back here.'";
         }
         return "cd " + shellEscape(workspace) + " && " + cmd;
     }

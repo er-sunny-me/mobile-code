@@ -346,10 +346,17 @@ public final class TermuxConstants {
      * Termux and its plugin app and package names and urls.
      */
 
-    /** Novus IDE app name */
-    public static final String TERMUX_APP_NAME = "Novus IDE"; // Rebranded: "Novus IDE"
-    /** Termux package name — must stay com.termux for bootstrap binary compatibility */
-    public static final String TERMUX_PACKAGE_NAME = "com.termux"; // Default: "com.termux"
+    /** Xyz.IDE app name */
+    public static final String TERMUX_APP_NAME = "Xyz.IDE"; // Rebranded: "Xyz.IDE"
+    /**
+     * App package name. Deliberately the same string length as "com.termux":
+     * the bundled Termux bootstrap binaries contain the absolute prefix path
+     * "/data/data/com.termux" compiled in, and the build byte-patches that
+     * string to "/data/data/com.xyzide" (identical length, so no offsets move).
+     * Do not change this to a different-length value without reworking the
+     * bootstrap patching in app/build.gradle.
+     */
+    public static final String TERMUX_PACKAGE_NAME = "com.xyzide"; // Default: "com.termux"
     /** Termux GitHub repo name */
     public static final String TERMUX_GITHUB_REPO_NAME = "termux-app"; // Default: "termux-app"
     /** Termux GitHub repo url */
@@ -924,18 +931,19 @@ public final class TermuxConstants {
         public static final String TERMUX_AM_SOCKET_FILE_PATH = APPS_DIR_PATH + "/termux-am/am.sock"; // Default: "/data/data/com.termux/files/apps/com.termux/termux-am/am.sock"
 
 
-        /** Termux app BuildConfig class name */
-        public static final String BUILD_CONFIG_CLASS_NAME = TERMUX_PACKAGE_NAME + ".BuildConfig"; // Default: "com.termux.BuildConfig"
+        /** Termux app BuildConfig class name. The Java code packages stay "com.termux.*" (only the
+         * applicationId changed), so class names must NOT be derived from TERMUX_PACKAGE_NAME. */
+        public static final String BUILD_CONFIG_CLASS_NAME = "com.termux.BuildConfig"; // Default: "com.termux.BuildConfig"
 
         /** Termux app FileShareReceiverActivity class name */
-        public static final String FILE_SHARE_RECEIVER_ACTIVITY_CLASS_NAME = TERMUX_PACKAGE_NAME + ".app.api.file.FileShareReceiverActivity"; // Default: "com.termux.app.api.file.FileShareReceiverActivity"
+        public static final String FILE_SHARE_RECEIVER_ACTIVITY_CLASS_NAME = "com.termux.app.api.file.FileShareReceiverActivity"; // Default: "com.termux.app.api.file.FileShareReceiverActivity"
 
         /** Termux app FileViewReceiverActivity class name */
-        public static final String FILE_VIEW_RECEIVER_ACTIVITY_CLASS_NAME = TERMUX_PACKAGE_NAME + ".app.api.file.FileViewReceiverActivity"; // Default: "com.termux.app.api.file.FileViewReceiverActivity"
+        public static final String FILE_VIEW_RECEIVER_ACTIVITY_CLASS_NAME = "com.termux.app.api.file.FileViewReceiverActivity"; // Default: "com.termux.app.api.file.FileViewReceiverActivity"
 
 
         /** Termux app core activity name. */
-        public static final String TERMUX_ACTIVITY_NAME = TERMUX_PACKAGE_NAME + ".app.TermuxActivity"; // Default: "com.termux.app.TermuxActivity"
+        public static final String TERMUX_ACTIVITY_NAME = "com.termux.app.TermuxActivity"; // Default: "com.termux.app.TermuxActivity"
 
         /**
          * Termux app core activity.
@@ -969,14 +977,14 @@ public final class TermuxConstants {
 
 
         /** Termux app settings activity name. */
-        public static final String TERMUX_SETTINGS_ACTIVITY_NAME = TERMUX_PACKAGE_NAME + ".app.activities.SettingsActivity"; // Default: "com.termux.app.activities.SettingsActivity"
+        public static final String TERMUX_SETTINGS_ACTIVITY_NAME = "com.termux.app.activities.SettingsActivity"; // Default: "com.termux.app.activities.SettingsActivity"
 
 
 
 
 
         /** Termux app core service name. */
-        public static final String TERMUX_SERVICE_NAME = TERMUX_PACKAGE_NAME + ".app.TermuxService"; // Default: "com.termux.app.TermuxService"
+        public static final String TERMUX_SERVICE_NAME = "com.termux.app.TermuxService"; // Default: "com.termux.app.TermuxService"
 
         /**
          * Termux app core service.

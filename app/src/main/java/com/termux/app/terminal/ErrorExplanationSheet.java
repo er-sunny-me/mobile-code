@@ -77,7 +77,7 @@ public class ErrorExplanationSheet extends BottomSheetDialog {
 
     private String buildErrorPrompt(ErrorDetector.DetectedError error, String fileContent) {
         StringBuilder sb = new StringBuilder();
-        sb.append("You are an expert debugging assistant in Mobile Code (Android terminal IDE).\n\n");
+        sb.append("You are an expert debugging assistant in Xyz.IDE (Android terminal IDE).\n\n");
         sb.append("## Error Detected\n");
         sb.append("Type: ").append(error.type).append("\n");
         if (error.command != null) sb.append("Command run: `").append(error.command).append("`\n");

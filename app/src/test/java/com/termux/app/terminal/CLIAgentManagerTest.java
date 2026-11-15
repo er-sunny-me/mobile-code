@@ -121,7 +121,7 @@ public class CLIAgentManagerTest {
     @Test
     public void everyAgentPathIsHomeRelativeSoItWorksInBothEnvironments() {
         // A template that knows only one literal absolute home fails in the other environment:
-        // /root is right inside the proot rootfs, /data/data/com.termux/files/home in native
+        // /root is right inside the proot rootfs, /data/data/com.xyzide/files/home in native
         // Termux. A $HOME-relative entry is correct in both, so one must be present.
         for (CLIAgentManager.CLIAgent agent : CLIAgentManager.AGENTS) {
             if (agent.id.equals("custom")) continue;
@@ -314,10 +314,10 @@ public class CLIAgentManagerTest {
     @Test
     public void workshopResultWinsTheDisplayedPathButTermuxHitIsKept() {
         java.util.Map<String, CLIAgentManager.FoundBinary> into = new java.util.HashMap<>();
-        CLIAgentManager.parseProbeOutput("agy=/data/data/com.termux/files/home/.local/bin/agy\n",
+        CLIAgentManager.parseProbeOutput("agy=/data/data/com.xyzide/files/home/.local/bin/agy\n",
                 false, into);
         assertTrue(into.get("agy").inTermux);
-        assertEquals("/data/data/com.termux/files/home/.local/bin/agy", into.get("agy").path);
+        assertEquals("/data/data/com.xyzide/files/home/.local/bin/agy", into.get("agy").path);
         CLIAgentManager.parseProbeOutput("agy=/root/.local/bin/agy\n", true, into);
         assertTrue(into.get("agy").inWorkshop);
         assertTrue(into.get("agy").inTermux);

@@ -137,7 +137,7 @@ public class AIKeysPreference extends Preference {
                     btnDownload.setLayoutParams(btnParams);
                     btnDownload.setOnClickListener(v -> {
                         android.content.Intent intent = new android.content.Intent(getContext(), com.termux.app.TermuxActivity.class);
-                        intent.setAction("com.termux.app.INSTALL_AGENT");
+                        intent.setAction("com.xyzide.app.INSTALL_AGENT");
                         intent.putExtra("agent_id", agent.id);
                         intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
                         getContext().startActivity(intent);

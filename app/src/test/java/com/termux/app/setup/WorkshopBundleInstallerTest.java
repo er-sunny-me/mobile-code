@@ -53,7 +53,7 @@ public class WorkshopBundleInstallerTest {
     public void extractCommandTargetsTheLegacySlotBothProotVersionsUnderstand() {
         String cmd = WorkshopBundleInstaller.buildRootfsExtractCommand(
                 "/cache/ubuntu-arm64.tar.gz",
-                "/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu");
+                "/data/data/com.xyzide/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu");
         assertTrue(cmd.contains("tar -xzpf"));
         assertTrue(cmd.contains("installed-rootfs/ubuntu"));
         // Paths with spaces must stay one shell word.

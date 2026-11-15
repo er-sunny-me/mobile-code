@@ -342,7 +342,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         super.onNewIntent(intent);
         setIntent(intent);
         
-        if ("com.termux.app.INSTALL_AGENT".equals(intent.getAction())) {
+        if ("com.xyzide.app.INSTALL_AGENT".equals(intent.getAction())) {
             String agentId = intent.getStringExtra("agent_id");
             if (agentId != null && mAiChatManager != null) {
                 mAiChatManager.installAgent(agentId);

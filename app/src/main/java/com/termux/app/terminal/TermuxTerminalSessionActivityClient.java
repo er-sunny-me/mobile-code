@@ -86,9 +86,9 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
     public void handleExecuteIntent(android.content.Intent intent) {
         if (intent == null) return;
         
-        String cwdToCd = intent.getStringExtra("com.termux.execute.cwd");
-        String fileToRun = intent.getStringExtra("com.termux.execute.file_to_run");
-        String commandToRun = intent.getStringExtra("com.termux.execute.command");
+        String cwdToCd = intent.getStringExtra("com.xyzide.execute.cwd");
+        String fileToRun = intent.getStringExtra("com.xyzide.execute.file_to_run");
+        String commandToRun = intent.getStringExtra("com.xyzide.execute.command");
         
         if (cwdToCd != null || fileToRun != null || commandToRun != null) {
             TerminalSession session = mActivity.getCurrentSession();
@@ -108,9 +108,9 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
                     session.write(commandToRun + "\n");
                 }
             }
-            intent.removeExtra("com.termux.execute.cwd"); // Consume it so it only runs once
-            intent.removeExtra("com.termux.execute.file_to_run");
-            intent.removeExtra("com.termux.execute.command");
+            intent.removeExtra("com.xyzide.execute.cwd"); // Consume it so it only runs once
+            intent.removeExtra("com.xyzide.execute.file_to_run");
+            intent.removeExtra("com.xyzide.execute.command");
         }
     }
 
@@ -481,7 +481,7 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
             String workingDirectory;
             if (currentSession == null) {
                 android.content.Intent intent = mActivity.getIntent();
-                workingDirectory = intent != null ? intent.getStringExtra("com.termux.execute.cwd") : null;
+                workingDirectory = intent != null ? intent.getStringExtra("com.xyzide.execute.cwd") : null;
                 if (workingDirectory == null) {
                     workingDirectory = mActivity.getProperties().getDefaultWorkingDirectory();
                 }
@@ -498,15 +498,15 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
                     .getString("workshop_distro", "ubuntu");
                 if (!distro.matches("[a-z][a-z0-9_.-]*")) distro = "ubuntu";
                 String bootScript = "if ! command -v proot-distro &> /dev/null; then " +
-                    "echo -e '\\e[1;32m[Mobile Code] Installing Ubuntu CLI Workshop Environment...\\e[0m'; " +
+                    "echo -e '\\e[1;32m[Xyz.IDE] Installing Ubuntu CLI Workshop Environment...\\e[0m'; " +
                     "pkg update -y && pkg install proot-distro -y; " +
                     "fi; " +
                     "if [ ! -d \"$PREFIX/var/lib/proot-distro/installed-rootfs/" + distro + "\" ] && [ ! -d \"$PREFIX/var/lib/proot-distro/containers/" + distro + "/rootfs\" ]; then " +
-                    "echo -e '\\e[1;34m[Mobile Code] Downloading " + distro + " Rootfs (This may take a few minutes)...\\e[0m'; " +
+                    "echo -e '\\e[1;34m[Xyz.IDE] Downloading " + distro + " Rootfs (This may take a few minutes)...\\e[0m'; " +
                     "proot-distro install " + distro + "; " +
                     "fi; " +
-                    "echo -e '\\e[1;32m[Mobile Code] Starting " + distro + " CLI Workshop...\\e[0m'; " +
-                    "proot-distro login " + distro + " || { echo -e '\\e[1;31m[Mobile Code] Failed to start " + distro + ". Dropping to bash...\\e[0m'; bash; }";
+                    "echo -e '\\e[1;32m[Xyz.IDE] Starting " + distro + " CLI Workshop...\\e[0m'; " +
+                    "proot-distro login " + distro + " || { echo -e '\\e[1;31m[Xyz.IDE] Failed to start " + distro + ". Dropping to bash...\\e[0m'; bash; }";
                 arguments = new String[]{"-c", bootScript};
             }
 

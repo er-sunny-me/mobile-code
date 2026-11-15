@@ -960,14 +960,14 @@ public class AgentChatActivity extends AppCompatActivity {
     /** Fall back to the proven interactive terminal path for this agent. */
     private void openInTerminal(String prompt) {
         Intent intent = new Intent(this, TermuxActivity.class);
-        intent.putExtra("com.termux.execute.cwd", workspace());
+        intent.putExtra("com.xyzide.execute.cwd", workspace());
         CLIAgentManager.CLIAgent agent = selectedAgent();
         if (agent != null) {
             String cmd = agentManager.buildLaunchCommand(agent, prompt == null ? "" : prompt, workspace());
-            intent.putExtra("com.termux.execute.command", cmd);
+            intent.putExtra("com.xyzide.execute.command", cmd);
         }
         if (!TextUtils.isEmpty(prompt)) {
-            intent.putExtra("com.termux.execute.prompt", prompt);
+            intent.putExtra("com.xyzide.execute.prompt", prompt);
         }
         startActivity(intent);
         overridePendingTransition(R.anim.slide_up, R.anim.stay);
@@ -976,8 +976,8 @@ public class AgentChatActivity extends AppCompatActivity {
     /** Interactive sign-in: full TUI (not -p) so OAuth / API-key flows can complete. */
     private void openLoginInTerminal(CLIAgentManager.CLIAgent agent) {
         Intent intent = new Intent(this, TermuxActivity.class);
-        intent.putExtra("com.termux.execute.cwd", workspace());
-        intent.putExtra("com.termux.execute.command",
+        intent.putExtra("com.xyzide.execute.cwd", workspace());
+        intent.putExtra("com.xyzide.execute.command",
                 agentManager.buildLoginCommand(agent, workspace()));
         startActivity(intent);
         overridePendingTransition(R.anim.slide_up, R.anim.stay);

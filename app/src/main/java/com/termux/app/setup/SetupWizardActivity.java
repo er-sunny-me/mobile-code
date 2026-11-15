@@ -121,7 +121,7 @@ public class SetupWizardActivity extends AppCompatActivity {
                 String text = logBuffer.toString();
                 if (text.trim().isEmpty()) text = "(log is empty)";
                 clipboard.setPrimaryClip(
-                        android.content.ClipData.newPlainText("Mobile Code setup log", text));
+                        android.content.ClipData.newPlainText("Xyz.IDE setup log", text));
                 Toast.makeText(this, "Setup log copied — paste it anywhere.", Toast.LENGTH_SHORT).show();
             } catch (Exception e) {
                 Toast.makeText(this, "Copy failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();

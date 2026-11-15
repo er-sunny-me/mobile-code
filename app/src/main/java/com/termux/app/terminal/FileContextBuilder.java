@@ -88,7 +88,7 @@ public class FileContextBuilder {
         String tree = buildFileTree(3);
         String filesContext = buildOpenFilesContext(openFiles, 3000);
         
-        return "You are an AI coding assistant embedded in Mobile Code.\n" +
+        return "You are an AI coding assistant embedded in Xyz.IDE.\n" +
                "You have access to the user's codebase context below.\n\n" +
                tree + "\n\n" +
                "CURRENTLY OPEN/TAGGED FILES:\n" +

@@ -52,23 +52,23 @@ android {
         minSdkVersion project.properties.minSdkVersion.toInteger()
         targetSdkVersion project.properties.targetSdkVersion.toInteger()
         multiDexEnabled true
-        applicationId "com.termux"
-        versionCode 130
-        versionName "0.0.2"
+        applicationId "com.xyzide"
+        versionCode 131
+        versionName "0.1.0"
 
         if (appVersionName) versionName = appVersionName
         validateVersionName(versionName)
 
         buildConfigField "String", "TERMUX_PACKAGE_VARIANT", "\"" + project.ext.packageVariant + "\"" // Used by TermuxApplication class
 
-        manifestPlaceholders.TERMUX_PACKAGE_NAME = "com.termux"
-        manifestPlaceholders.TERMUX_APP_NAME = "Mobile Code"
-        manifestPlaceholders.TERMUX_API_APP_NAME = "Mobile Code:API"
-        manifestPlaceholders.TERMUX_BOOT_APP_NAME = "Mobile Code:Boot"
-        manifestPlaceholders.TERMUX_FLOAT_APP_NAME = "Mobile Code:Float"
-        manifestPlaceholders.TERMUX_STYLING_APP_NAME = "Mobile Code:Styling"
-        manifestPlaceholders.TERMUX_TASKER_APP_NAME = "Mobile Code:Tasker"
-        manifestPlaceholders.TERMUX_WIDGET_APP_NAME = "Mobile Code:Widget"
+        manifestPlaceholders.TERMUX_PACKAGE_NAME = "com.xyzide"
+        manifestPlaceholders.TERMUX_APP_NAME = "Xyz.IDE"
+        manifestPlaceholders.TERMUX_API_APP_NAME = "Xyz.IDE:API"
+        manifestPlaceholders.TERMUX_BOOT_APP_NAME = "Xyz.IDE:Boot"
+        manifestPlaceholders.TERMUX_FLOAT_APP_NAME = "Xyz.IDE:Float"
+        manifestPlaceholders.TERMUX_STYLING_APP_NAME = "Xyz.IDE:Styling"
+        manifestPlaceholders.TERMUX_TASKER_APP_NAME = "Xyz.IDE:Tasker"
+        manifestPlaceholders.TERMUX_WIDGET_APP_NAME = "Xyz.IDE:Widget"
 
         externalNativeBuild {
             ndkBuild {
@@ -507,10 +507,10 @@ task downloadBootstraps() {
         def packageVariant = project.ext.packageVariant
         if (packageVariant == "apt-android-7") {
             def version = "2026.02.12-r1" + "%2B" + "apt.android-7"
-            downloadBootstrap("aarch64", "ea2aeba8819e517db711f8c32369e89e7c52cee73e07930ff91185e1ab93f4f3", version)
-            downloadBootstrap("arm", "a38f4d3b2f735f83be2bf54eff463e86dc32a3e2f9f861c1557c4378d249c018", version)
-            downloadBootstrap("i686", "f5bc0b025b9f3b420b5fcaeefc064f888f5f22a0d6fd7090f4aac0c33eb3555b", version)
-            downloadBootstrap("x86_64", "b7fd0f2e3a4de534be3144f9f91acc768630fc463eaf134ab2e64c545e834f7a", version)
+            downloadBootstrap("aarch64", "ec6e302b1379e0d6bbb17146406b7101a91e128c421159821ab17b272dd610c3", version)
+            downloadBootstrap("arm", "2872347580fcd2d5a64522f65a87cb5773925d226da18cdfd1db0ef45982dd02", version)
+            downloadBootstrap("i686", "30ce6bdc0626d2a6a6cdad473bf4734cdc1f0318914ef0366d6bbd95a10c4659", version)
+            downloadBootstrap("x86_64", "9741c4c51a4e69dbccf1d7992567ebc86108180d171bc64f1071753ced3d6424", version)
         } else if (packageVariant == "apt-android-5") {
             def version = "2022.04.28-r6" + "+" + packageVariant
             downloadBootstrap("aarch64", "913609d439415c828c5640be1b0561467e539cb1c7080662decaaca2fb4820e7", version)
