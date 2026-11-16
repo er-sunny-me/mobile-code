@@ -40,6 +40,9 @@ public class CLIAgentManager {
     /** How long a shell probe of installed binaries stays valid. */
     private static final long PROBE_CACHE_TTL_MS = 5000;
 
+    /** Hard cap for one probe process (install check or live-model query). */
+    private static final long PROBE_TIMEOUT_MS = 30000;
+
     private final Context context;
     private final SharedPreferences prefs;
 
@@ -92,7 +95,7 @@ public class CLIAgentManager {
             "claude",
             "if ! command -v claude &> /dev/null; then if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm install -g @anthropic-ai/claude-code; fi",
             "claude",
-            "claude -p \"{prompt}\"",
+            "claude -p \"{prompt}\" --dangerously-skip-permissions",
             "🟠"
         ),
         new CLIAgent(
@@ -102,7 +105,7 @@ public class CLIAgentManager {
             "agy",
             "if ! command -v agy &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://antigravity.google/cli/install.sh | bash; grep -qF '$HOME/.local/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc; fi; export PATH=\"$HOME/.local/bin:" + TermuxConstants.TERMUX_HOME_DIR_PATH + "/.local/bin:/root/.local/bin:$PATH\"; hash -r 2>/dev/null || true; command -v agy && agy --version || echo 'NOTE: installed but not on PATH yet — restart the terminal (exec $SHELL -l) or run: export PATH=\"$HOME/.local/bin:$PATH\"'",
             "export PATH=\"$HOME/.local/bin:$PATH\" && agy",
-            "export PATH=\"$HOME/.local/bin:$PATH\" && agy -p \"{prompt}\"",
+            "export PATH=\"$HOME/.local/bin:$PATH\" && agy -p \"{prompt}\" --dangerously-skip-permissions",
             "🔵"
         ),
         new CLIAgent(
@@ -112,7 +115,7 @@ public class CLIAgentManager {
             "codex",
             "if ! command -v codex &> /dev/null; then if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y nodejs npm || pkg install -y nodejs; fi; npm install -g @openai/codex; fi",
             "codex",
-            "codex exec \"{prompt}\"",
+            "codex exec \"{prompt}\" --dangerously-bypass-approvals-and-sandbox",
             "⚪"
         ),
         new CLIAgent(
@@ -122,7 +125,7 @@ public class CLIAgentManager {
             "kiro-cli",
             "if ! command -v kiro-cli &> /dev/null; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://cli.kiro.dev/install | bash; grep -qF '$HOME/.local/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc; fi",
             "export PATH=\"$HOME/.local/bin:$PATH\" && kiro-cli",
-            "export PATH=\"$HOME/.local/bin:$PATH\" && kiro-cli chat \"{prompt}\"",
+            "export PATH=\"$HOME/.local/bin:$PATH\" && kiro-cli chat \"{prompt}\" --trust-all-tools",
             "🟢"
         ),
         new CLIAgent(
@@ -142,7 +145,7 @@ public class CLIAgentManager {
             "opencode",
             "if ! command -v opencode &> /dev/null && [ ! -x \"$HOME/.opencode/bin/opencode\" ]; then if ! command -v curl &> /dev/null; then apt-get update && apt-get install -y curl || pkg install -y curl; fi; curl -k -fsSL https://opencode.ai/install | bash; grep -qF '$HOME/.opencode/bin' ~/.bashrc 2>/dev/null || echo 'export PATH=\"$HOME/.opencode/bin:$PATH\"' >> ~/.bashrc; fi; export PATH=\"$HOME/.opencode/bin:" + TermuxConstants.TERMUX_HOME_DIR_PATH + "/.opencode/bin:/root/.opencode/bin:$PATH\"; hash -r 2>/dev/null || true; command -v opencode && opencode --version || { [ -x \"$HOME/.opencode/bin/opencode\" ] && \"$HOME/.opencode/bin/opencode\" --version || echo 'NOTE: installed but not on PATH yet — restart the terminal (exec $SHELL -l) or run: export PATH=\"$HOME/.opencode/bin:$PATH\"'; }",
             "export PATH=\"$HOME/.opencode/bin:$PATH\" && opencode",
-            "export PATH=\"$HOME/.opencode/bin:$PATH\" && opencode run \"{prompt}\"",
+            "export PATH=\"$HOME/.opencode/bin:$PATH\" && opencode run \"{prompt}\" --dangerously-skip-permissions",
             "🟡"
         ),
         new CLIAgent(
@@ -162,7 +165,7 @@ public class CLIAgentManager {
             "copilot",
             "if ! command -v copilot &> /dev/null; then echo 'Installing GitHub Copilot...'; if ! command -v npm &> /dev/null; then apt-get update && apt-get install -y curl ca-certificates && curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && apt-get install -y nodejs || pkg install -y nodejs; fi; npm install -g @github/copilot || { echo 'Installation failed. Press enter to exit.'; read; }; fi",
             "npx -y @github/copilot",
-            "npx -y @github/copilot -p \"{prompt}\"",
+            "npx -y @github/copilot -p \"{prompt}\" --allow-all-tools",
             "🐙"
         ),
         new CLIAgent(
@@ -450,14 +453,36 @@ public class CLIAgentManager {
             pb.environment().put("LANG", "en_US.UTF-8");
             pb.redirectErrorStream(true);
             process = pb.start();
+            // Watchdog: a probe target that waits on the network or an auth
+            // prompt would otherwise block the caller forever (the live-model
+            // fetch used to hang silently and never deliver results). Kill the
+            // process after the timeout; the read loop then ends at EOF and
+            // whatever output was gathered is returned.
+            final Process running = process;
+            Thread watchdog = new Thread(() -> {
+                try {
+                    Thread.sleep(PROBE_TIMEOUT_MS);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                try {
+                    running.destroy();
+                } catch (Exception ignored) {
+                }
+            }, "probe-watchdog");
+            watchdog.setDaemon(true);
+            watchdog.start();
             BufferedReader reader =
                     new BufferedReader(new InputStreamReader(process.getInputStream()));
             StringBuilder output = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
-                output.append(line).append('\n');
+                if (output.length() < 512 * 1024) {
+                    output.append(line).append('\n');
+                }
             }
             process.waitFor();
+            watchdog.interrupt();
             return output.toString();
         } catch (Exception ignored) {
             // Treat an unreadable environment as "nothing installed".
@@ -795,8 +820,52 @@ public class CLIAgentManager {
                 seen.add(candidate);
                 found.add(candidate);
             }
+
+            // Display-name listings (e.g. Antigravity prints "Gemini 2.5 Pro
+            // (High)") never match the dashed-id checks above, so the live
+            // fetch used to come back empty for those CLIs. Normalise the
+            // leading words of the line into a dashed id and test that too.
+            String dashed = dashedDisplayNameCandidate(trimmed);
+            if (dashed != null && looksLikeModelName(agentId, dashed) && !seen.contains(dashed)) {
+                seen.add(dashed);
+                found.add(dashed);
+            }
         }
         return found;
+    }
+
+    /**
+     * Turn a human display name at the start of a line ("Gemini 2.5 Pro (High)",
+     * "Claude Sonnet 4.5") into the dashed id form ("gemini-2.5-pro"), or null
+     * when the line does not start with a known model family word.
+     */
+    static String dashedDisplayNameCandidate(String line) {
+        if (line == null) return null;
+        String lower = line.toLowerCase();
+        if (!lower.startsWith("gemini") && !lower.startsWith("claude")
+                && !lower.startsWith("gpt") && !lower.startsWith("grok")
+                && !lower.startsWith("deepseek")) {
+            return null;
+        }
+        String[] tokens = lower.split("[^a-z0-9.]+");
+        StringBuilder sb = new StringBuilder();
+        int used = 0;
+        for (String token : tokens) {
+            if (token.isEmpty()) continue;
+            if (used == 3) break;
+            // Stop before parenthetical qualifiers like "(high)"/"(low)" —
+            // the split above already removed the bracket, so stop on the
+            // bare qualifier words instead.
+            if (used > 0 && (token.equals("high") || token.equals("low")
+                    || token.equals("medium") || token.equals("default"))) {
+                break;
+            }
+            if (sb.length() > 0) sb.append('-');
+            sb.append(token);
+            used++;
+        }
+        String candidate = sb.toString();
+        return candidate.length() >= 3 ? candidate : null;
     }
 
     public static String buildModelProbeCommand(CLIAgent agent) {
@@ -839,6 +908,16 @@ public class CLIAgentManager {
         }
 
         List<String> parsed = parseModelsFromCliOutput(agent.id, rawOutput);
+        if (parsed.isEmpty()) {
+            // The run-environment probe printed something we could not parse
+            // (or nothing at all): also try the other environment and parse
+            // both outputs together before giving up to the cache/known list.
+            String nativeRaw = runProbeScript(cmd);
+            if (nativeRaw != null && !nativeRaw.trim().isEmpty()) {
+                parsed = parseModelsFromCliOutput(agent.id,
+                        (rawOutput == null ? "" : rawOutput) + "\n" + nativeRaw);
+            }
+        }
         if (!parsed.isEmpty()) {
             saveLiveModelsCache(agent.id, parsed);
             return parsed;
@@ -901,6 +980,24 @@ public class CLIAgentManager {
         } else {
             prefs.edit().putString(KEY_AGENT_MODEL_PREFIX + agentId, model).apply();
         }
+    }
+
+    private static final String KEY_GUI_SESSION_ACTIVE_PREFIX = "gui_session_active_";
+
+    /**
+     * Whether the GUI chat has a resumable CLI-side session for this agent.
+     * Persisted (not just an activity field) so an activity recreation —
+     * rotation, process restart, coming back from the terminal — does not
+     * silently drop the "continue" state and restart the conversation.
+     */
+    public boolean isGuiSessionActive(String agentId) {
+        return agentId != null
+                && prefs.getBoolean(KEY_GUI_SESSION_ACTIVE_PREFIX + agentId, false);
+    }
+
+    public void setGuiSessionActive(String agentId, boolean active) {
+        if (agentId == null) return;
+        prefs.edit().putBoolean(KEY_GUI_SESSION_ACTIVE_PREFIX + agentId, active).apply();
     }
 
     /**
@@ -1026,12 +1123,24 @@ public class CLIAgentManager {
             }
         }
 
+        // Permission fix: the chat GUI cannot answer interactive tool-approval
+        // prompts (one-shot -p processes never read stdin for approvals, so the
+        // agent used to get every file edit / command denied). Make sure the
+        // agent's auto-approve flag is present even when the user has an older
+        // saved GUI-command override that predates the flag.
+        cmd = ensureAutoApproveFlag(agent.id, cmd);
+
         // If continuing an ongoing conversation, resume the previous session
         if (continueSession) {
             if (agent.id.equals("antigravity")) {
                 if (!cmd.contains(" -c ") && !cmd.contains(" --continue")) {
-                    String continueCmd = cmd.replaceFirst("\\bagy\\b", "agy -c");
-                    cmd = "{ " + continueCmd + " || " + cmd + "; }";
+                    // Try both spellings: if this agy build rejects --continue the
+                    // -c form still resumes; only when both fail do we start fresh.
+                    // (With only one form, a rejected flag silently restarted the
+                    // conversation on every message.)
+                    String continueLong = cmd.replaceFirst("\\bagy\\b", "agy --continue");
+                    String continueShort = cmd.replaceFirst("\\bagy\\b", "agy -c");
+                    cmd = "{ { " + continueLong + " || " + continueShort + "; } || " + cmd + "; }";
                 }
             } else if (agent.id.equals("claude_code")) {
                 if (!cmd.contains(" --continue") && !cmd.contains(" -c ")) {
@@ -1082,6 +1191,43 @@ public class CLIAgentManager {
         }
 
         return "cd " + shellEscape(workspace) + " && " + cmd;
+    }
+
+    /**
+     * Append the agent's auto-approve / skip-permissions flag when the command
+     * does not already carry one. GUI chat runs are one-shot: there is no
+     * terminal for the CLI to prompt in, so without this flag every tool call
+     * that needs approval is silently denied and the agent cannot edit files
+     * or run commands from the chat view.
+     */
+    static String ensureAutoApproveFlag(String agentId, String cmd) {
+        if (agentId == null || cmd == null) return cmd;
+        switch (agentId) {
+            case "claude_code":
+            case "antigravity":
+            case "opencode":
+                if (!cmd.contains("skip-permissions") && !cmd.contains("permission-mode")) {
+                    return cmd + " --dangerously-skip-permissions";
+                }
+                return cmd;
+            case "codex":
+                if (!cmd.contains("bypass-approvals") && !cmd.contains("ask-for-approval")) {
+                    return cmd + " --dangerously-bypass-approvals-and-sandbox";
+                }
+                return cmd;
+            case "kiro":
+                if (!cmd.contains("trust-all-tools") && !cmd.contains("trust-tools")) {
+                    return cmd + " --trust-all-tools";
+                }
+                return cmd;
+            case "github_copilot":
+                if (!cmd.contains("allow-all-tools") && !cmd.contains("allow-tool")) {
+                    return cmd + " --allow-all-tools";
+                }
+                return cmd;
+            default:
+                return cmd;
+        }
     }
 
     /** The GUI command template for an agent: the user's override if set, else the built-in default. */

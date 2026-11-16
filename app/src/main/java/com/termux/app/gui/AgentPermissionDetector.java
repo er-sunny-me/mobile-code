@@ -36,11 +36,16 @@ public class AgentPermissionDetector {
         if (trimmed.isEmpty()) return false;
         String lower = trimmed.toLowerCase();
 
-        boolean hasYn = lower.contains("(y/n)") || lower.contains("[y/n]")
+        // A real interactive prompt is a short line on its own. Long lines that
+        // merely quote "(y/n)" inside normal output (code, docs, the agent
+        // explaining a prompt) used to spawn fake permission cards whose
+        // Allow button sent "y" to a process that was not listening.
+        boolean shortLine = trimmed.length() <= 160;
+        boolean hasYn = shortLine && (lower.contains("(y/n)") || lower.contains("[y/n]")
                 || lower.contains("(y/N)") || lower.contains("[y/n]")
                 || lower.contains("(Y/n)") || lower.contains("[Y/n]")
                 || lower.contains("(yes/no)") || lower.contains("[yes/no]")
-                || lower.contains("[y/n/a]") || lower.contains("[Y/n/a]");
+                || lower.contains("[y/n/a]") || lower.contains("[Y/n/a]"));
 
         boolean hasPromptKeywords = lower.contains("allow write_file")
                 || lower.contains("allow edit_file")

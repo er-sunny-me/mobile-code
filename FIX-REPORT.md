@@ -96,3 +96,53 @@ occurrences of `com.termux`.
   official checksums; only the default `apt-android-7` variant is patched.
 - If upstream Termux publishes a new bootstrap version, re-run
   `scripts/patch-bootstrap.py` and update the four checksums.
+
+---
+
+# Round 2 — GUI chat fixes (2026-11-16, X ke report par)
+
+Teen bugs X ne report kiye, teeno ki jad code me mili aur fix hui:
+
+## 1. Permission — GUI chat me agent tools use hi nahi kar pata tha
+- **Jad:** GUI commands one-shot (`-p`) mode me chalte hain; us mode me CLI
+  interactive approval maang hi nahi sakta — har file edit / command silently
+  deny ho jata tha. Upar se permission card ka "Allow" dabane par `y` ek aise
+  process ke stdin me jata tha jo sun hi nahi raha tha, aur app phir bhi
+  "✅ Allowed" dikha deta tha (jhoothi tasalli).
+- **Fix:** har agent ke GUI command me uska auto-approve flag pakka kiya —
+  Claude/Antigravity/OpenCode `--dangerously-skip-permissions`, Codex
+  `--dangerously-bypass-approvals-and-sandbox`, Kiro `--trust-all-tools`,
+  Copilot `--allow-all-tools`. Purani saved custom commands par bhi
+  `ensureAutoApproveFlag()` wahi flag jod deta hai. Allow/Reject ab
+  `sendInput` ka result check karke sach bolta hai ("nothing was sent" jab
+  koi process sun na raha ho). Lambi output lines me "(y/n)" aane par bante
+  nakli permission cards bhi band (sirf chhoti prompt lines par card banega).
+
+## 2. Har message par conversation restart
+- **Jad (do hisse):** (a) agent jawab dekar non-zero exit kare (kai CLI
+  warning par aisa karte hain) to app session flag clear kar deta tha — agla
+  message fresh start. (b) session flag sirf activity ki memory me tha;
+  activity recreate ya agent switch par gayab. Antigravity par sirf `-c`
+  try hota tha — flag reject ho to bhi silent fresh start.
+- **Fix:** jawab mila ho aur hard failure (127 / command not found /
+  unexpected argument / auth) na ho to session active rehta hai. Flag ab
+  per-agent SharedPreferences me persist hota hai aur agent switch par
+  usi agent ka state restore hota hai. Antigravity continue ab
+  `--continue` → `-c` → fresh, teeno step try karta hai.
+
+## 3. Realtime model fetch sahi se nahi hota tha
+- **Jad (teen hisse):** (a) probe process par koi timeout nahi tha — CLI
+  network/auth par atke to fetch hamesha ke liye atak jata tha, callback
+  kabhi nahi aata tha. (b) Antigravity jaise CLI models display naam me
+  dete hain ("Gemini 2.5 Pro (High)") — parser sirf dashed id dhoondhta
+  tha, list khaali aati thi. (c) pehle environment ka output parse na ho
+  to dusra environment try hi nahi hota tha.
+- **Fix:** probe par 30s watchdog + output cap; display naam ko dashed id
+  me badal kar bhi parse (`dashedDisplayNameCandidate`); pehla parse khaali
+  ho to dusre environment ka output jod kar dobara parse. Refresh toast ab
+  sach bolta hai ("Model list refreshed — N models").
+
+## Verify
+- Unit tests: **60/60 PASS** (`:app:testDebugUnitTest`).
+- Full build: **BUILD SUCCESSFUL** — universal debug APK dobara bana
+  (package `com.xyzide` hi hai; is baar workshop bundle sahit ~677MB).

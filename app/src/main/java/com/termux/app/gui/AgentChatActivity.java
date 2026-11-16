@@ -385,7 +385,10 @@ public class AgentChatActivity extends AppCompatActivity {
                 if (position < 0 || position >= enabledAgents.size()) return;
                 CLIAgentManager.CLIAgent agent = enabledAgents.get(position);
                 agentManager.setSelectedAgent(agent.id);
-                hasActiveSession = false;
+                // Restore THIS agent's own session state — switching agents used
+                // to wipe the flag for everyone, so coming back to an agent
+                // restarted its conversation.
+                hasActiveSession = agentManager.isGuiSessionActive(agent.id);
                 if (rowRunning != null) rowRunning.setVisibility(View.GONE);
                 if (promptInput != null) {
                     promptInput.setHint("Message " + agent.name + "…");
@@ -403,6 +406,7 @@ public class AgentChatActivity extends AppCompatActivity {
 
         CLIAgentManager.CLIAgent current = selectedAgent();
         if (current != null) {
+            hasActiveSession = agentManager.isGuiSessionActive(current.id);
             updateRunningLabelFor(current);
             if (promptInput != null) {
                 promptInput.setHint("Message " + current.name + "…");
@@ -412,12 +416,25 @@ public class AgentChatActivity extends AppCompatActivity {
         updateModelAndThinkingChips();
     }
 
+    /**
+     * Set the "this agent has a resumable session" state, persisted per agent
+     * so it survives activity recreation. Dropping this state is what made the
+     * chat restart the conversation from zero on the next message.
+     */
+    private void setSessionActive(boolean active) {
+        hasActiveSession = active;
+        CLIAgentManager.CLIAgent cur = selectedAgent();
+        if (cur != null) {
+            agentManager.setGuiSessionActive(cur.id, active);
+        }
+    }
+
     private void startNewSession() {
         if (runner != null && runner.isRunning()) {
             Toast.makeText(this, "An agent is currently running. Stop it first.", Toast.LENGTH_SHORT).show();
             return;
         }
-        hasActiveSession = false;
+        setSessionActive(false);
         currentSession = null;
         adapter.clear();
         showWelcome();
@@ -438,6 +455,9 @@ public class AgentChatActivity extends AppCompatActivity {
         if (session == null) return;
         currentSession = session;
         hasActiveSession = !session.messages.isEmpty();
+        // Persist against the SESSION's agent (the spinner selection only
+        // changes further below, so the generic helper would write the wrong key).
+        agentManager.setGuiSessionActive(session.agentId, hasActiveSession);
         adapter.clear();
         for (ChatMessage msg : session.messages) {
             adapter.add(msg);
@@ -798,7 +818,7 @@ public class AgentChatActivity extends AppCompatActivity {
                 findViewById(R.id.btn_chat_send).setEnabled(true);
 
                 if (exitCode == 0) {
-                    hasActiveSession = true;
+                    setSessionActive(true);
                     // Keep agent continuous and active & ready!
                     rowRunning.setVisibility(View.VISIBLE);
                     if (progressRunning != null) progressRunning.setVisibility(View.GONE);
@@ -810,7 +830,7 @@ public class AgentChatActivity extends AppCompatActivity {
                     }
                     promptInput.setHint("Reply to " + agent.name + "…");
                 } else {
-                    hasActiveSession = false;
+                    setSessionActive(false);
                     rowRunning.setVisibility(View.GONE);
                     adapter.markLastAsError();
                     promptInput.setHint("Message " + agent.name + "…");
@@ -849,6 +869,27 @@ public class AgentChatActivity extends AppCompatActivity {
                         hint = "If this agent needs an interactive terminal, "
                                 + "use the terminal button above.";
                     }
+                    boolean hardFailure = exitCode == 127
+                            || fullOutput.contains("command not found")
+                            || fullOutput.contains("unexpected argument")
+                            || fullOutput.contains("read only from -p");
+                    if (!hardFailure && !fullOutput.trim().isEmpty()) {
+                        // The agent answered but exited non-zero (several CLIs
+                        // do this on mere warnings). Its CLI-side session still
+                        // exists, so keep the conversation resumable — clearing
+                        // the flag here is what restarted the chat on every
+                        // message after a partially-failed run.
+                        setSessionActive(true);
+                        rowRunning.setVisibility(View.VISIBLE);
+                        if (progressRunning != null) progressRunning.setVisibility(View.GONE);
+                        if (runningLabel != null) {
+                            runningLabel.setText("🟢 " + agent.name + " is Active & Ready");
+                        }
+                        if (btnChatStop != null) {
+                            btnChatStop.setVisibility(View.VISIBLE);
+                        }
+                        promptInput.setHint("Reply to " + agent.name + "…");
+                    }
                     adapter.add(new ChatMessage(ChatMessage.Type.STATUS,
                             "Exited with code " + exitCode + ". " + hint));
                 }
@@ -866,7 +907,7 @@ public class AgentChatActivity extends AppCompatActivity {
                 if (tvStripLiveStatus != null) {
                     tvStripLiveStatus.setText("Failed to start");
                 }
-                hasActiveSession = false;
+                setSessionActive(false);
                 rowRunning.setVisibility(View.GONE);
                 findViewById(R.id.btn_chat_send).setEnabled(true);
                 adapter.add(new ChatMessage(ChatMessage.Type.ERROR, message, agent.name, agent.iconEmoji));
@@ -897,7 +938,7 @@ public class AgentChatActivity extends AppCompatActivity {
         } else if (hasActiveSession) {
             adapter.add(new ChatMessage(ChatMessage.Type.STATUS, "Session ended"));
         }
-        hasActiveSession = false;
+        setSessionActive(false);
         if (currentSession != null) {
             currentSession.messages.clear();
             currentSession.messages.addAll(adapter.getMessages());
@@ -987,7 +1028,7 @@ public class AgentChatActivity extends AppCompatActivity {
         adapter.setOnPermissionActionListener(new ChatMessageAdapter.OnPermissionActionListener() {
             @Override
             public void onAllow(ChatMessage message, int position) {
-                runner.sendInput("y\n");
+                boolean sent = runner.sendInput("y\n");
                 message.permissionDecision = ChatMessage.PermissionDecision.ALLOWED;
                 adapter.notifyItemChanged(position);
                 if (currentSession != null) {
@@ -996,12 +1037,17 @@ public class AgentChatActivity extends AppCompatActivity {
                     sessionManager.saveSession(currentSession);
                 }
                 String target = message.permissionTarget != null ? message.permissionTarget : "action";
-                Toast.makeText(AgentChatActivity.this, "✅ Allowed: " + target, Toast.LENGTH_SHORT).show();
+                // Be honest when nothing heard the answer: one-shot runs do not
+                // read stdin, so claiming "Allowed" used to lie to the user.
+                Toast.makeText(AgentChatActivity.this,
+                        sent ? "✅ Allowed: " + target
+                                : "⚠️ Agent isn't waiting for input right now — nothing was sent",
+                        Toast.LENGTH_SHORT).show();
             }
 
             @Override
             public void onReject(ChatMessage message, int position) {
-                runner.sendInput("n\n");
+                boolean sent = runner.sendInput("n\n");
                 message.permissionDecision = ChatMessage.PermissionDecision.REJECTED;
                 adapter.notifyItemChanged(position);
                 if (currentSession != null) {
@@ -1009,7 +1055,10 @@ public class AgentChatActivity extends AppCompatActivity {
                     currentSession.messages.addAll(adapter.getMessages());
                     sessionManager.saveSession(currentSession);
                 }
-                Toast.makeText(AgentChatActivity.this, "❌ Rejected", Toast.LENGTH_SHORT).show();
+                Toast.makeText(AgentChatActivity.this,
+                        sent ? "❌ Rejected"
+                                : "⚠️ Agent isn't waiting for input right now — nothing was sent",
+                        Toast.LENGTH_SHORT).show();
             }
 
             @Override
@@ -1073,7 +1122,7 @@ public class AgentChatActivity extends AppCompatActivity {
 
         if (message.permissionDecision == ChatMessage.PermissionDecision.PENDING) {
             builder.setNegativeButton("✅ Allow", (dialog, which) -> {
-                runner.sendInput("y\n");
+                boolean sent = runner.sendInput("y\n");
                 message.permissionDecision = ChatMessage.PermissionDecision.ALLOWED;
                 adapter.notifyItemChanged(position);
                 if (currentSession != null) {
@@ -1081,7 +1130,10 @@ public class AgentChatActivity extends AppCompatActivity {
                     currentSession.messages.addAll(adapter.getMessages());
                     sessionManager.saveSession(currentSession);
                 }
-                Toast.makeText(this, "✅ Allowed: " + message.permissionTarget, Toast.LENGTH_SHORT).show();
+                Toast.makeText(this,
+                        sent ? "✅ Allowed: " + message.permissionTarget
+                                : "⚠️ Agent isn't waiting for input right now — nothing was sent",
+                        Toast.LENGTH_SHORT).show();
             });
         }
 
@@ -1166,7 +1218,7 @@ public class AgentChatActivity extends AppCompatActivity {
                         Toast.makeText(this, "Querying " + agent.name + " CLI for available models…", Toast.LENGTH_SHORT).show();
                         agentManager.queryLiveModelsAsync(agent, liveModels -> {
                             updateModelAndThinkingChips();
-                            Toast.makeText(this, "Loaded " + liveModels.size() + " models from " + agent.name, Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "Model list refreshed — " + liveModels.size() + " models for " + agent.name, Toast.LENGTH_SHORT).show();
                             showModelSelectionDialog();
                         });
                     } else if (which == customIndex) {
