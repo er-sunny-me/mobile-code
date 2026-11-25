@@ -261,19 +261,23 @@ clean {
 }
 
 // ------------------------------------------------------------------
-// Workshop bundle: Ubuntu rootfs + CLI agent binaries packed into the APK
-// (app/src/main/assets/workshop/) so first-run setup is fast/offline.
-// Ubuntu stays bundled always; agents are bundled for testing builds.
-// Opt-out:  -PbundleWorkshop=0  (no rootfs)  -PbundleAgents=0 (no agents)
-//           -PbundleBigAgents=0 (skip grok ~160MB + kiro ~157MB)
+// Workshop bundle: ONLY the Ubuntu rootfs is packed into the APK
+// (app/src/main/assets/workshop/, ~58MB for arm64 + x86_64) so first-run
+// setup installs Ubuntu offline/fast. X's order (2026-11-25, second round):
+// Ubuntu stays pre-bundled, and ONLY Ubuntu — CLI agent binaries are NOT
+// bundled; the setup wizard downloads the selected agents once at
+// first-run install time (wizard stays re-runnable from Settings).
+//   -PbundleWorkshop=0  (opt out: no rootfs, wizard downloads Ubuntu too)
+//   -PbundleAgents=1    (opt in: bundle agent binaries ~90MB)
+//   -PbundleBigAgents=1 (opt in: also bundle grok ~160MB + kiro ~130MB)
 // The whole directory is git-ignored; the task re-downloads when missing.
 // Failures are loud warnings, never build breakers: the setup wizard falls
 // back to network install when a bundled file is absent.
 // ------------------------------------------------------------------
 ext {
     bundleWorkshop = (findProperty("bundleWorkshop") ?: "1") != "0"
-    bundleAgents = (findProperty("bundleAgents") ?: "1") != "0"
-    bundleBigAgents = (findProperty("bundleBigAgents") ?: "1") != "0"
+    bundleAgents = (findProperty("bundleAgents") ?: "0") != "0"
+    bundleBigAgents = (findProperty("bundleBigAgents") ?: "0") != "0"
 }
 
 def sha256Hex(File file) {

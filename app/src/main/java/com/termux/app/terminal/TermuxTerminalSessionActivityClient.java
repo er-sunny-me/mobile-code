@@ -20,6 +20,7 @@ import com.termux.R;
 import com.termux.shared.interact.ShareUtils;
 import com.termux.shared.termux.shell.command.runner.terminal.TermuxSession;
 import com.termux.shared.termux.interact.TextInputDialogUtils;
+import com.termux.app.RepoCompatInstaller;
 import com.termux.app.TermuxActivity;
 import com.termux.shared.termux.terminal.TermuxTerminalSessionClientBase;
 import com.termux.shared.termux.TermuxConstants;
@@ -93,19 +94,36 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         if (cwdToCd != null || fileToRun != null || commandToRun != null) {
             TerminalSession session = mActivity.getCurrentSession();
             if (session != null && session.getEmulator() != null) {
-                if (cwdToCd != null) {
-                    session.write("cd \"" + cwdToCd + "\" && clear\n");
-                }
-                if (fileToRun != null) {
-                    String cmd = "";
-                    if (fileToRun.endsWith(".py")) cmd = "python \"" + fileToRun + "\"";
-                    else if (fileToRun.endsWith(".js")) cmd = "node \"" + fileToRun + "\"";
-                    else if (fileToRun.endsWith(".sh")) cmd = "bash \"" + fileToRun + "\"";
-                    else cmd = "cat \"" + fileToRun + "\"";
-                    session.write(cmd + "\n");
-                }
-                if (commandToRun != null) {
-                    session.write(commandToRun + "\n");
+                // Running-agent check: when an agent TUI is already live in
+                // this session, ANY text written here lands inside that TUI —
+                // reopening the terminal used to type `cd "<dir>" && clear`
+                // and even the agent start command into e.g. OpenCode's
+                // model picker, garbling whatever the user was typing. The
+                // check reads the session's live /proc process tree, so once
+                // the agent exits the normal send behaviour returns by itself.
+                String runningAgentId = session.getPid() > 0
+                        ? CLIAgentManager.findRunningAgentIdForSessionPid(session.getPid())
+                        : null;
+                if (runningAgentId != null) {
+                    CLIAgentManager.CLIAgent running = CLIAgentManager.findAgent(runningAgentId);
+                    mActivity.showToast("⚡ " + (running != null ? running.name : "Agent")
+                            + " is already running in this terminal — not sending commands again",
+                            true);
+                } else {
+                    if (cwdToCd != null) {
+                        session.write("cd \"" + cwdToCd + "\" && clear\n");
+                    }
+                    if (fileToRun != null) {
+                        String cmd = "";
+                        if (fileToRun.endsWith(".py")) cmd = "python \"" + fileToRun + "\"";
+                        else if (fileToRun.endsWith(".js")) cmd = "node \"" + fileToRun + "\"";
+                        else if (fileToRun.endsWith(".sh")) cmd = "bash \"" + fileToRun + "\"";
+                        else cmd = "cat \"" + fileToRun + "\"";
+                        session.write(cmd + "\n");
+                    }
+                    if (commandToRun != null) {
+                        session.write(commandToRun + "\n");
+                    }
                 }
             }
             intent.removeExtra("com.xyzide.execute.cwd"); // Consume it so it only runs once
@@ -151,6 +169,7 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
 
     private long lastErrorCheckTime = 0;
     private long lastPopupTime = 0;
+    private long lastAuthUrlCheckTime = 0;
 
     @Override
     public void onTextChanged(@NonNull TerminalSession changedSession) {
@@ -158,12 +177,39 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
 
         if (mActivity.getCurrentSession() == changedSession) {
             mActivity.getTerminalView().onScreenUpdated();
-            
+
             long now = System.currentTimeMillis();
             if (now - lastErrorCheckTime > 5000) { // Check every 5s max
                 lastErrorCheckTime = now;
                 checkTerminalForErrors(changedSession);
             }
+            if (now - lastAuthUrlCheckTime > 2000) { // Check every 2s max
+                lastAuthUrlCheckTime = now;
+                checkTerminalForAuthUrl(changedSession);
+            }
+        }
+    }
+
+    /**
+     * Agent CLIs print OAuth URLs and wait ("Your browser should open
+     * automatically. If not: …") — in a phone terminal nothing opens by
+     * itself, so scan the transcript tail and open a recognised sign-in URL
+     * in the browser, once per unique URL (see AuthUrlOpener). The
+     * joined-lines transcript re-joins display-wrapped lines, so a wrapped
+     * OAuth URL is seen whole.
+     */
+    private void checkTerminalForAuthUrl(TerminalSession session) {
+        if (session.getEmulator() == null || session.getEmulator().getScreen() == null) return;
+        String transcript = session.getEmulator().getScreen().getTranscriptTextWithFullLinesJoined();
+        if (transcript == null || transcript.isEmpty()) return;
+        // Generous tail: a full OAuth URL is ~1.1k chars, and the detector
+        // must see its start even when a TUI screen of text follows it.
+        // (The detector itself now handles hard-wrapped prints and refuses
+        // partial URLs — see AuthUrlOpener.)
+        String tail = transcript.length() > 12000 ? transcript.substring(transcript.length() - 12000) : transcript;
+        if (AuthUrlOpener.findAuthUrl(tail) != null) {
+            mActivity.runOnUiThread(() ->
+                    AuthUrlOpener.openAuthUrlIfPresent(mActivity, tail, "agent"));
         }
     }
 
@@ -493,13 +539,17 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
             String[] arguments = null;
 
             if (!isFailSafe) {
+                // The boot script below may pkg-install proot-distro; repo .debs
+                // need the translation layer first (see RepoCompatInstaller).
+                RepoCompatInstaller.ensureInstalled();
                 executablePath = TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/bin/bash";
                 String distro = mActivity.getSharedPreferences("ZeroCodePrefs", android.content.Context.MODE_PRIVATE)
                     .getString("workshop_distro", "ubuntu");
                 if (!distro.matches("[a-z][a-z0-9_.-]*")) distro = "ubuntu";
-                String bootScript = "if ! command -v proot-distro &> /dev/null; then " +
+                String bootScript = "export TERMUX_PKG_NO_MIRROR_SELECT=1; " +
+                    "if ! command -v proot-distro &> /dev/null; then " +
                     "echo -e '\\e[1;32m[Xyz.IDE] Installing Ubuntu CLI Workshop Environment...\\e[0m'; " +
-                    "pkg update -y && pkg install proot-distro -y; " +
+                    "pkg update -y && pkg install -y ncurses ncurses-utils proot-distro; " +
                     "fi; " +
                     "if [ ! -d \"$PREFIX/var/lib/proot-distro/installed-rootfs/" + distro + "\" ] && [ ! -d \"$PREFIX/var/lib/proot-distro/containers/" + distro + "/rootfs\" ]; then " +
                     "echo -e '\\e[1;34m[Xyz.IDE] Downloading " + distro + " Rootfs (This may take a few minutes)...\\e[0m'; " +

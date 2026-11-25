@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.termux.R;
+import com.termux.app.RepoCompatInstaller;
 import com.termux.app.terminal.CLIAgentManager;
 
 import java.util.List;
@@ -289,11 +290,14 @@ public class AgentDashboardActivity extends AppCompatActivity implements AgentLi
 
     /** Install the Ubuntu rootfs in native Termux (must NOT run inside the workshop). */
     private void runWorkshopSetup(Runnable onDone) {
+        // Repo .debs cannot unpack under com.xyzide without the translation
+        // layer (see RepoCompatInstaller) — make sure it is in place first.
+        RepoCompatInstaller.ensureInstalled();
         adapter.setInstalling("__workshop__");
         hintView.setText("Setting up Ubuntu workshop (1/" + setupTotal + ")… "
                 + "this downloads ~200MB once.");
         String command = CLIAgentManager.shellPrelude()
-                + "if ! command -v proot-distro &> /dev/null; then pkg update -y && pkg install -y proot-distro; fi; "
+                + "if ! command -v proot-distro &> /dev/null; then pkg update -y && pkg install -y ncurses ncurses-utils proot-distro; fi; "
                 + "if [ ! -d \"$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu\" ]; then proot-distro install ubuntu; fi";
         // Workshop is missing so AgentRunner runs this in native Termux. Correct env.
         installRunner.run(homeDir(), command, new AgentRunner.Listener() {

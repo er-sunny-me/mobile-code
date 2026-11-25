@@ -126,10 +126,14 @@ public class AgentRunner {
 
         ProcessBuilder pb = new ProcessBuilder(bash, "-lc", effectiveCommand);
         File dir = new File(cwd == null ? TermuxConstants.TERMUX_HOME_DIR_PATH : cwd);
+        if (!dir.isDirectory()) dir.mkdirs();
         if (!dir.isDirectory()) {
             dir = new File(TermuxConstants.TERMUX_HOME_DIR_PATH);
+            if (!dir.isDirectory()) dir.mkdirs();
         }
-        pb.directory(dir);
+        // A missing working dir makes ProcessBuilder.start() throw error=2
+        // naming bash — only set a directory that really exists.
+        if (dir.isDirectory()) pb.directory(dir);
 
         // Mirror the environment TermuxService gives the login shell.
         pb.environment().put("PREFIX", TermuxConstants.TERMUX_PREFIX_DIR_PATH);

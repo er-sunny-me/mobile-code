@@ -25,7 +25,9 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.termux.R;
 import com.termux.app.TermuxActivity;
+import com.termux.app.terminal.AuthUrlOpener;
 import com.termux.app.terminal.CLIAgentManager;
+import com.termux.app.terminal.OpenCodeLink;
 import com.termux.shared.termux.TermuxConstants;
 
 import java.io.File;
@@ -68,6 +70,25 @@ public class AgentChatActivity extends AppCompatActivity {
     private AgentRunner runner;
     private ChatMessageAdapter adapter;
 
+    // OpenCode linked-session state (see OpenCodeLink): while a linked turn
+    // is active, replies stream into these two live bubbles instead of the
+    // one-shot pendingOutput buffer.
+    private final OpenCodeLink openCodeLink = new OpenCodeLink();
+    private volatile boolean linkTurnActive = false;
+    private ChatMessage liveAgentMsg;
+    private ChatMessage liveThinkingMsg;
+    private long linkTurnStartMs = 0;
+
+    // Duplicate-send guard (OpenCode): the last prompt actually dispatched
+    // and when. Re-sending the identical text while its turn is still in
+    // flight is ignored with a status note (a double-tap / keyboard+button
+    // double-fire otherwise created two identical user bubbles and could
+    // queue a second turn). Cleared when the turn finishes, so sending the
+    // same text again afterwards works normally.
+    private String lastSentPromptText;
+    private long lastSentPromptMs;
+    private static final long DUPLICATE_SEND_WINDOW_MS = 30_000;
+
     private RecyclerView recyclerView;
     private Spinner agentSpinner;
     private EditText promptInput;
@@ -90,6 +111,11 @@ public class AgentChatActivity extends AppCompatActivity {
     private ArrayAdapter<AgentSlashCommands.Command> slashCommandsAdapter;
     private final List<AgentSlashCommands.Command> visibleSlashCommands = new ArrayList<>();
 
+    // The currently showing model picker, if any — the async refresh path
+    // re-opens it, and a stale instance must be dismissed first so dialogs
+    // never stack or leak.
+    private AlertDialog modelSelectionDialog;
+
     // Model & Thinking configuration strip
     private View btnSelectModel;
     private TextView tvCurrentModel;
@@ -104,7 +130,7 @@ public class AgentChatActivity extends AppCompatActivity {
     private final Runnable thinkingTimerRunnable = new Runnable() {
         @Override
         public void run() {
-            if (runner != null && runner.isRunning()) {
+            if ((runner != null && runner.isRunning()) || linkTurnActive) {
                 long elapsed = System.currentTimeMillis() - executionStartTime;
                 int seconds = (int) (elapsed / 1000);
                 CLIAgentManager.CLIAgent agent = selectedAgent();
@@ -284,21 +310,24 @@ public class AgentChatActivity extends AppCompatActivity {
         super.onDestroy();
         handler.removeCallbacks(flushRunnable);
         thinkingTimerHandler.removeCallbacks(thinkingTimerRunnable);
+        if (modelSelectionDialog != null && modelSelectionDialog.isShowing()) {
+            modelSelectionDialog.dismiss();
+        }
+        modelSelectionDialog = null;
         if (runner != null) runner.cancel();
     }
 
     @Override
     public void onBackPressed() {
         if (runner != null && runner.isRunning()) {
-            new AlertDialog.Builder(this)
+            showDialogSafely(new AlertDialog.Builder(this)
                     .setTitle("Agent is still running")
                     .setMessage("Stop it and leave?")
                     .setPositiveButton("Stop", (d, w) -> {
                         stopAgent();
                         finish();
                     })
-                    .setNegativeButton("Keep working", null)
-                    .show();
+                    .setNegativeButton("Keep working", null));
             return;
         }
         super.onBackPressed();
@@ -397,6 +426,7 @@ public class AgentChatActivity extends AppCompatActivity {
                 updateRunningLabelFor(agent);
                 updateModelAndThinkingChips();
                 agentManager.queryLiveModelsAsync(agent, liveModels -> updateModelAndThinkingChips());
+                agentManager.refreshRealModelAsync(agent, realModel -> updateModelAndThinkingChips());
             }
 
             @Override
@@ -412,6 +442,7 @@ public class AgentChatActivity extends AppCompatActivity {
                 promptInput.setHint("Message " + current.name + "…");
             }
             agentManager.queryLiveModelsAsync(current, liveModels -> updateModelAndThinkingChips());
+            agentManager.refreshRealModelAsync(current, realModel -> updateModelAndThinkingChips());
         }
         updateModelAndThinkingChips();
     }
@@ -517,7 +548,7 @@ public class AgentChatActivity extends AppCompatActivity {
                     + " (" + s.messages.size() + " messages)";
         }
 
-        new AlertDialog.Builder(this)
+        showDialogSafely(new AlertDialog.Builder(this)
                 .setTitle("Chat History (" + sessions.size() + ")")
                 .setItems(titles, (dialog, which) -> {
                     if (runner != null && runner.isRunning()) {
@@ -527,7 +558,7 @@ public class AgentChatActivity extends AppCompatActivity {
                     loadSession(sessions.get(which), true);
                 })
                 .setNeutralButton("Delete All", (dialog, which) -> {
-                    new AlertDialog.Builder(this)
+                    showDialogSafely(new AlertDialog.Builder(this)
                             .setTitle("Delete all chat sessions?")
                             .setMessage("All saved chat history will be removed.")
                             .setPositiveButton("Delete", (d2, w2) -> {
@@ -537,11 +568,9 @@ public class AgentChatActivity extends AppCompatActivity {
                                 startNewSession();
                                 Toast.makeText(this, "All sessions deleted", Toast.LENGTH_SHORT).show();
                             })
-                            .setNegativeButton("Cancel", null)
-                            .show();
+                            .setNegativeButton("Cancel", null));
                 })
-                .setNegativeButton("Close", null)
-                .show();
+                .setNegativeButton("Close", null));
     }
 
     private CLIAgentManager.CLIAgent selectedAgent() {
@@ -638,8 +667,23 @@ public class AgentChatActivity extends AppCompatActivity {
         final String attachedImage = pendingAttachedImagePath;
         final List<String> attachedFiles = new ArrayList<>(pendingAttachedFiles);
 
+        // Duplicate-send guard: identical text while its turn is still in
+        // flight (and freshly sent) is a double-send, not a new message —
+        // ignore it with a note instead of adding a second bubble/turn.
+        if (agent.id.equals("opencode")
+                && OpenCodeLink.isDuplicateSend(lastSentPromptText, lastSentPromptMs,
+                        effectivePrompt, System.currentTimeMillis(),
+                        runner.isRunning() || linkTurnActive, DUPLICATE_SEND_WINDOW_MS)) {
+            adapter.add(new ChatMessage(ChatMessage.Type.STATUS,
+                    "⏳ Already sent — that turn is still running, so it was not sent twice."));
+            scrollToBottom();
+            return;
+        }
+
         // If an agent process is currently running and active, stream input directly via stdin
-        if (runner.isRunning()) {
+        // (a linked OpenCode turn also counts as busy: sendInput() then just
+        // reports false and the user gets the busy toast, like before)
+        if (runner.isRunning() || linkTurnActive) {
             boolean sent = runner.sendInput(effectivePrompt + "\n");
             if (sent) {
                 promptInput.setText("");
@@ -666,15 +710,14 @@ public class AgentChatActivity extends AppCompatActivity {
 
         if (!agentManager.isAgentInstalled(agent) && !agent.id.equals("custom")) {
             boolean elsewhere = agentManager.isAgentInstalledElsewhere(agent);
-            new AlertDialog.Builder(this)
+            showDialogSafely(new AlertDialog.Builder(this)
                     .setTitle(agent.name + (elsewhere ? " is in the wrong place" : " is not installed"))
                     .setMessage(elsewhere
                             ? "It exists on this phone but NOT where agents run. Open Coding Agents and tap Reinstall on it."
                             : "Install it from the Coding Agents screen first?")
                     .setPositiveButton("Open Agents", (d, w) ->
                             startActivity(new Intent(this, AgentDashboardActivity.class)))
-                    .setNegativeButton("Cancel", null)
-                    .show();
+                    .setNegativeButton("Cancel", null));
             return;
         }
 
@@ -682,7 +725,7 @@ public class AgentChatActivity extends AppCompatActivity {
         final String command = agentManager.buildGuiPromptCommand(agent, effectivePrompt, workspace(), isContinuing);
         if (command == null || command.trim().isEmpty()) {
             // No non-interactive mode configured for this agent.
-            new AlertDialog.Builder(this)
+            showDialogSafely(new AlertDialog.Builder(this)
                     .setTitle(agent.name + " has no GUI mode")
                     .setMessage("This agent has no known non-interactive command, so it cannot run "
                             + "inside the chat view. Open it in the terminal instead?\n\n"
@@ -690,8 +733,7 @@ public class AgentChatActivity extends AppCompatActivity {
                     .setPositiveButton("Open Terminal", (d, w) -> openInTerminal(effectivePrompt))
                     .setNeutralButton("Set Command", (d, w) ->
                             startActivity(new Intent(this, AgentDashboardActivity.class)))
-                    .setNegativeButton("Cancel", null)
-                    .show();
+                    .setNegativeButton("Cancel", null));
             return;
         }
 
@@ -744,7 +786,32 @@ public class AgentChatActivity extends AppCompatActivity {
 
         final StringBuilder diffBuffer = new StringBuilder();
 
-        runner.run(workspace(), command, new AgentRunner.Listener() {
+        if (agent.id.equals("opencode")) {
+            // Record for the duplicate-send guard before dispatching.
+            lastSentPromptText = effectivePrompt;
+            lastSentPromptMs = System.currentTimeMillis();
+            startOpenCodeLinkTurn(agent, effectivePrompt, command, isContinuing, diffBuffer);
+            return;
+        }
+
+        runner.run(workspace(), command, makeRunnerListener(agent, isContinuing, diffBuffer));
+    }
+
+    /**
+     * The one-shot process listener, factored out so the OpenCode linked
+     * path can fall back to exactly the same handling when the shared
+     * server is unavailable.
+     */
+    private AgentRunner.Listener makeRunnerListener(final CLIAgentManager.CLIAgent agent,
+                                                    final boolean isContinuing,
+                                                    final StringBuilder diffBuffer) {
+        return new AgentRunner.Listener() {
+            /** Rolling tail of this run's output for auth-URL scanning: a
+             *  sign-in URL can arrive split across output lines (hard
+             *  wraps), so scanning line-by-line alone would miss or
+             *  truncate it — the accumulated text is scanned instead. */
+            private final StringBuilder authScanBuffer = new StringBuilder();
+
             @Override
             public void onStarted(String cmd) {
                 String env = runner.getLastEnvironment() == AgentRunner.Environment.UBUNTU_WORKSHOP
@@ -758,6 +825,17 @@ public class AgentChatActivity extends AppCompatActivity {
 
             @Override
             public void onOutput(String line) {
+                // Sign-in flows print an OAuth URL and wait: open it in the
+                // browser automatically (once per unique URL) instead of
+                // leaving the user to copy a wrapped URL by hand. Scan the
+                // accumulated output, not just this line — the detector
+                // re-joins hard-wrapped segments and refuses partial URLs.
+                authScanBuffer.append(line).append('\n');
+                if (authScanBuffer.length() > 12000) {
+                    authScanBuffer.delete(0, authScanBuffer.length() - 12000);
+                }
+                AuthUrlOpener.openAuthUrlIfPresent(AgentChatActivity.this,
+                        authScanBuffer.toString(), agent.name);
                 if (!firstOutputReceived) {
                     firstOutputReceived = true;
                     long elapsed = System.currentTimeMillis() - executionStartTime;
@@ -808,6 +886,12 @@ public class AgentChatActivity extends AppCompatActivity {
 
             @Override
             public void onFinished(int exitCode) {
+                if (agent.id.equals("opencode")) {
+                    // One-shot fallback turn over: re-sending the same text
+                    // is legitimate again (duplicate-send guard).
+                    lastSentPromptText = null;
+                    lastSentPromptMs = 0;
+                }
                 thinkingTimerHandler.removeCallbacks(thinkingTimerRunnable);
                 if (tvStripLiveStatus != null) {
                     tvStripLiveStatus.setText(exitCode == 0 ? "Ready" : "Error (" + exitCode + ")");
@@ -854,7 +938,9 @@ public class AgentChatActivity extends AppCompatActivity {
                                 "Exited with code " + exitCode + ". " + hint));
                         scrollToBottom();
                         // Offer the one-tap login path: interactive TUI in the workshop.
-                        new AlertDialog.Builder(AgentChatActivity.this)
+                        // This runs in a runner callback — the activity may
+                        // already be gone, so go through the safe helper.
+                        showDialogSafely(new AlertDialog.Builder(AgentChatActivity.this)
                                 .setTitle(agent.name + " needs sign-in")
                                 .setMessage("Open " + agent.name + " in the terminal to complete "
                                         + "sign-in?\n\nFor Antigravity: if no browser opens, copy "
@@ -862,8 +948,7 @@ public class AgentChatActivity extends AppCompatActivity {
                                         + "and paste the code back into the terminal.")
                                 .setPositiveButton("Open Terminal",
                                         (d, w) -> openLoginInTerminal(agent))
-                                .setNegativeButton("Later", null)
-                                .show();
+                                .setNegativeButton("Later", null));
                         return;
                     } else {
                         hint = "If this agent needs an interactive terminal, "
@@ -922,11 +1007,245 @@ public class AgentChatActivity extends AppCompatActivity {
                 }
                 scrollToBottom();
             }
+        };
+    }
+
+    /**
+     * OpenCode linked turn: the prompt goes into the shared live server
+     * session (see {@link OpenCodeLink}) and the reply streams back into
+     * live bubbles — no per-message CLI cold start, and the same session is
+     * what the terminal shows via {@code opencode attach}. When the link is
+     * unavailable, falls back to the exact one-shot path other agents use.
+     */
+    private void startOpenCodeLinkTurn(final CLIAgentManager.CLIAgent agent,
+                                       final String effectivePrompt,
+                                       final String fallbackCommand,
+                                       final boolean isContinuing,
+                                       final StringBuilder diffBuffer) {
+        linkTurnActive = true;
+        linkTurnStartMs = System.currentTimeMillis();
+        liveAgentMsg = null;
+        liveThinkingMsg = null;
+        if (runningLabel != null) {
+            runningLabel.setText("🔗 Linking " + agent.name + " session…");
+        }
+        if (tvStripLiveStatus != null) {
+            tvStripLiveStatus.setText("🔗 Linking…");
+        }
+        String selected = agentManager.getAgentModel(agent.id);
+        final String modelId = (selected == null || selected.equals("default")) ? null : selected;
+
+        // Thinking level → the model's own server variant (linked mode).
+        // The level is resolved against the variant names the selected
+        // model actually defines; when it cannot be applied the user is
+        // told why, in the chat, instead of the level being silently
+        // dropped (the old Off-only dialog hid this entirely).
+        final String thinkingLevel = agentManager.getAgentThinkingLevel(agent.id);
+        final String effectiveModel = modelId != null ? modelId : agentManager.getCachedRealModel(agent.id);
+        final String variant = agentManager.resolveThinkingVariant(agent.id, effectiveModel, thinkingLevel);
+        if (thinkingLevel != null && !thinkingLevel.startsWith("Off") && variant == null) {
+            java.util.List<String> known = agentManager.getModelVariants(effectiveModel);
+            String modelName = effectiveModel == null ? "This model" : effectiveModel;
+            String why;
+            if (known == null) {
+                why = "variant support for " + modelName + " has not been fetched yet"
+                        + " — open the model picker once and tap Query / Refresh.";
+            } else if (known.isEmpty()) {
+                why = modelName + " exposes no thinking variants"
+                        + " — it reasons at its own default.";
+            } else {
+                why = modelName + " only offers these thinking variants: "
+                        + TextUtils.join(", ", known) + ".";
+            }
+            adapter.add(new ChatMessage(ChatMessage.Type.STATUS,
+                    "🧠 Thinking \"" + thinkingLevel + "\" not applied: " + why
+                            + " Prompt sent without a variant."));
+            scrollToBottom();
+        }
+
+        openCodeLink.sendPrompt(workspace(), effectivePrompt, modelId, variant, new OpenCodeLink.Listener() {
+            @Override
+            public void onLinked(String sessionId) {
+                if (isFinishing() || isDestroyed()) return;
+                if (runningLabel != null) {
+                    runningLabel.setText("🟢 " + agent.name + " linked session is live…");
+                }
+                if (tvStripLiveStatus != null) {
+                    tvStripLiveStatus.setText("🧠 Thinking…");
+                }
+            }
+
+            @Override
+            public void onText(String snapshot) {
+                if (isFinishing() || isDestroyed()) return;
+                AuthUrlOpener.openAuthUrlIfPresent(AgentChatActivity.this, snapshot, agent.name);
+                markFirstOutput(agent);
+                updateLiveBubble(agent, false, snapshot);
+            }
+
+            @Override
+            public void onReasoning(String snapshot) {
+                if (isFinishing() || isDestroyed()) return;
+                markFirstOutput(agent);
+                updateLiveBubble(agent, true, snapshot);
+            }
+
+            @Override
+            public void onTool(String label) {
+                if (isFinishing() || isDestroyed()) return;
+                if (tvStripLiveStatus != null) {
+                    tvStripLiveStatus.setText("🔧 " + label);
+                }
+            }
+
+            @Override
+            public void onFinished(String error) {
+                linkTurnActive = false;
+                if (isFinishing() || isDestroyed()) return;
+                finishLinkTurn(agent, error);
+            }
+
+            @Override
+            public void onUnavailable(String reason) {
+                linkTurnActive = false;
+                if (isFinishing() || isDestroyed()) return;
+                adapter.add(new ChatMessage(ChatMessage.Type.STATUS,
+                        "Linked session unavailable (" + reason + ") — running one-shot instead."));
+                runner.run(workspace(), fallbackCommand,
+                        makeRunnerListener(agent, isContinuing, diffBuffer));
+            }
         });
+    }
+
+    private void markFirstOutput(CLIAgentManager.CLIAgent agent) {
+        if (firstOutputReceived) return;
+        firstOutputReceived = true;
+        long elapsed = System.currentTimeMillis() - executionStartTime;
+        int seconds = (int) (elapsed / 1000);
+        if (tvStripLiveStatus != null) {
+            tvStripLiveStatus.setText("⚡ Streaming answer (" + seconds + "s)…");
+        }
+        if (runningLabel != null) {
+            runningLabel.setText("⚡ " + agent.name + " is replying… (" + seconds + "s)");
+        }
+    }
+
+    /** Create or update the live streaming bubble (agent text or reasoning). */
+    private void updateLiveBubble(CLIAgentManager.CLIAgent agent, boolean thinking, String snapshot) {
+        if (snapshot == null) return;
+        ChatMessage msg = thinking ? liveThinkingMsg : liveAgentMsg;
+        if (msg == null) {
+            msg = new ChatMessage(thinking ? ChatMessage.Type.THINKING : ChatMessage.Type.AGENT,
+                    snapshot, agent.name, agent.iconEmoji);
+            msg.streaming = true;
+            if (thinking) {
+                liveThinkingMsg = msg;
+            } else {
+                liveAgentMsg = msg;
+            }
+            adapter.add(msg);
+        } else {
+            if (snapshot.equals(msg.text)) return;
+            msg.text = snapshot;
+            adapter.refreshMessage(msg);
+        }
+        scrollToBottom();
+    }
+
+    private void finishLinkTurn(CLIAgentManager.CLIAgent agent, String error) {
+        // Turn over: the same text may legitimately be sent again now.
+        lastSentPromptText = null;
+        lastSentPromptMs = 0;
+        thinkingTimerHandler.removeCallbacks(thinkingTimerRunnable);
+        long duration = System.currentTimeMillis() - linkTurnStartMs;
+        if (liveThinkingMsg != null) {
+            liveThinkingMsg.streaming = false;
+            liveThinkingMsg.thinkingDurationMs = duration;
+            adapter.refreshMessage(liveThinkingMsg);
+        }
+        if (liveAgentMsg != null) {
+            liveAgentMsg.streaming = false;
+            adapter.refreshMessage(liveAgentMsg);
+        }
+        liveAgentMsg = null;
+        liveThinkingMsg = null;
+        findViewById(R.id.btn_chat_send).setEnabled(true);
+        if (tvStripLiveStatus != null) {
+            tvStripLiveStatus.setText(error == null ? "Ready" : "Error");
+        }
+        if (error == null) {
+            setSessionActive(true);
+            rowRunning.setVisibility(View.VISIBLE);
+            if (progressRunning != null) progressRunning.setVisibility(View.GONE);
+            if (runningLabel != null) {
+                runningLabel.setText("🟢 " + agent.name + " is Active & Ready (linked)");
+            }
+            if (btnChatStop != null) btnChatStop.setVisibility(View.VISIBLE);
+            promptInput.setHint("Reply to " + agent.name + "…");
+        } else {
+            adapter.add(new ChatMessage(ChatMessage.Type.STATUS,
+                    "Linked turn ended: " + error));
+            // The server-side session survives a failed turn, so the
+            // conversation stays continuable — do not reset the chat.
+            setSessionActive(true);
+            rowRunning.setVisibility(View.VISIBLE);
+            if (progressRunning != null) progressRunning.setVisibility(View.GONE);
+            if (runningLabel != null) {
+                runningLabel.setText("🟢 " + agent.name + " is Active & Ready (linked)");
+            }
+            if (btnChatStop != null) btnChatStop.setVisibility(View.VISIBLE);
+            promptInput.setHint("Reply to " + agent.name + "…");
+        }
+        if (currentSession != null) {
+            currentSession.messages.clear();
+            currentSession.messages.addAll(adapter.getMessages());
+            sessionManager.saveSession(currentSession);
+        }
+        scrollToBottom();
     }
 
     private void stopAgent() {
         thinkingTimerHandler.removeCallbacks(thinkingTimerRunnable);
+        // A stopped turn is finished: re-sending the same text is allowed.
+        lastSentPromptText = null;
+        lastSentPromptMs = 0;
+        if (linkTurnActive) {
+            // Stop = abort the current TURN only. The shared server and its
+            // session stay alive in the background (the terminal keeps the
+            // same conversation), unlike the one-shot path where Stop kills
+            // the process and ends the session.
+            openCodeLink.abortTurn();
+            linkTurnActive = false;
+            if (tvStripLiveStatus != null) {
+                tvStripLiveStatus.setText("Ready");
+            }
+            if (liveThinkingMsg != null) {
+                liveThinkingMsg.streaming = false;
+                adapter.refreshMessage(liveThinkingMsg);
+            }
+            if (liveAgentMsg != null) {
+                liveAgentMsg.streaming = false;
+                adapter.refreshMessage(liveAgentMsg);
+            }
+            liveAgentMsg = null;
+            liveThinkingMsg = null;
+            adapter.add(new ChatMessage(ChatMessage.Type.STATUS,
+                    "Turn stopped — the linked session stays alive in the background."));
+            if (rowRunning != null) rowRunning.setVisibility(View.VISIBLE);
+            if (progressRunning != null) progressRunning.setVisibility(View.GONE);
+            CLIAgentManager.CLIAgent cur = selectedAgent();
+            if (runningLabel != null && cur != null) {
+                runningLabel.setText("🟢 " + cur.name + " is Active & Ready (linked)");
+            }
+            findViewById(R.id.btn_chat_send).setEnabled(true);
+            if (currentSession != null) {
+                currentSession.messages.clear();
+                currentSession.messages.addAll(adapter.getMessages());
+                sessionManager.saveSession(currentSession);
+            }
+            scrollToBottom();
+            return;
+        }
         if (tvStripLiveStatus != null) {
             tvStripLiveStatus.setText("Ready");
         }
@@ -1137,7 +1456,7 @@ public class AgentChatActivity extends AppCompatActivity {
             });
         }
 
-        builder.show();
+        showDialogSafely(builder);
     }
 
     private void showWelcome() {
@@ -1160,7 +1479,17 @@ public class AgentChatActivity extends AppCompatActivity {
 
         if (tvCurrentModel != null) {
             String model = agentManager.getAgentModel(agent.id);
-            tvCurrentModel.setText(model);
+            // "default" is the sentinel for "the CLI's own default" — never
+            // show a made-up model id here (that was the wrong-model glitch:
+            // the chip named a model the CLI did not even offer). When the
+            // real default has been fetched from the CLI's own config/state
+            // files, name it; otherwise fall back to the honest bare label.
+            if ("default".equalsIgnoreCase(model)) {
+                String real = agentManager.getCachedRealModel(agent.id);
+                tvCurrentModel.setText(real != null ? real : "Default");
+            } else {
+                tvCurrentModel.setText(model);
+            }
         }
 
         if (tvCurrentThinking != null) {
@@ -1173,7 +1502,46 @@ public class AgentChatActivity extends AppCompatActivity {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Dialog safety
+    // ------------------------------------------------------------------
+
+    /**
+     * True only while this activity's window token is still valid. Async
+     * callbacks (live-model query, real-model fetch, agent-runner finish)
+     * can land after the user has left or the activity is being destroyed;
+     * showing a dialog then crashes with BadTokenException ("Unable to add
+     * window — is your activity running?"), which is exactly the crash the
+     * real-model refresh path produced when it re-opened the model picker.
+     * Every dialog in this activity goes through the guards below.
+     */
+    private boolean canShowDialog() {
+        return !isFinishing() && !isDestroyed();
+    }
+
+    private void showDialogSafely(AlertDialog.Builder builder) {
+        if (builder == null || !canShowDialog()) return;
+        try {
+            builder.show();
+        } catch (android.view.WindowManager.BadTokenException ignored) {
+            // Activity went away between the lifecycle check and show().
+        }
+    }
+
+    private void showDialogSafely(AlertDialog dialog) {
+        if (dialog == null || !canShowDialog()) return;
+        try {
+            dialog.show();
+        } catch (android.view.WindowManager.BadTokenException ignored) {
+            // Activity went away between the lifecycle check and show().
+        }
+    }
+
     private void showModelSelectionDialog() {
+        // Async callers (the refresh chain below) can reach here after the
+        // activity is gone — skip the dialog then; the fetched data is
+        // already cached, so the next open shows it.
+        if (!canShowDialog()) return;
         CLIAgentManager.CLIAgent agent = selectedAgent();
         if (agent == null) return;
 
@@ -1183,7 +1551,13 @@ public class AgentChatActivity extends AppCompatActivity {
 
         List<String> displayItems = new ArrayList<>();
         int selectedIndex = 0;
-        displayItems.add("Default (" + defaultModel + ")");
+        // "Default" = no --model is passed, the CLI uses its own configured
+        // default. The label names that default once it has been FETCHED
+        // from the CLI's own config/state files ("Default (opencode/big-
+        // pickle)"); before/without a fetch it stays the honest generic
+        // label — never an invented id (the old "Default (deepseek-r1)").
+        final String defaultLabel = agentManager.getDefaultModelLabel(agent.id);
+        displayItems.add(defaultLabel);
         for (int i = 0; i < models.size(); i++) {
             String m = models.get(i);
             displayItems.add(m);
@@ -1205,21 +1579,30 @@ public class AgentChatActivity extends AppCompatActivity {
 
         String[] itemArray = displayItems.toArray(new String[0]);
 
-        new AlertDialog.Builder(this)
+        // Never stack two pickers: the async refresh re-opens this dialog,
+        // and a previous instance may still be up.
+        if (modelSelectionDialog != null && modelSelectionDialog.isShowing()) {
+            modelSelectionDialog.dismiss();
+        }
+        modelSelectionDialog = new AlertDialog.Builder(this)
                 .setTitle("Select Model (" + agent.name + ")")
                 .setSingleChoiceItems(itemArray, selectedIndex, (dialog, which) -> {
                     if (which == 0) {
                         agentManager.setAgentModel(agent.id, null);
                         updateModelAndThinkingChips();
-                        Toast.makeText(this, "Model set to Default (" + defaultModel + ")", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Model set to " + defaultLabel, Toast.LENGTH_SHORT).show();
                         dialog.dismiss();
                     } else if (which == refreshIndex) {
                         dialog.dismiss();
                         Toast.makeText(this, "Querying " + agent.name + " CLI for available models…", Toast.LENGTH_SHORT).show();
                         agentManager.queryLiveModelsAsync(agent, liveModels -> {
-                            updateModelAndThinkingChips();
-                            Toast.makeText(this, "Model list refreshed — " + liveModels.size() + " models for " + agent.name, Toast.LENGTH_SHORT).show();
-                            showModelSelectionDialog();
+                            // Also re-fetch the real default so the reopened
+                            // picker's Default row names it.
+                            agentManager.refreshRealModelAsync(agent, realModel -> {
+                                updateModelAndThinkingChips();
+                                Toast.makeText(this, "Model list refreshed — " + liveModels.size() + " models for " + agent.name, Toast.LENGTH_SHORT).show();
+                                showModelSelectionDialog();
+                            });
                         });
                     } else if (which == customIndex) {
                         dialog.dismiss();
@@ -1233,19 +1616,23 @@ public class AgentChatActivity extends AppCompatActivity {
                     }
                 })
                 .setNegativeButton("Cancel", null)
-                .show();
+                .create();
+        modelSelectionDialog.setOnDismissListener(d -> {
+            if (modelSelectionDialog == d) modelSelectionDialog = null;
+        });
+        showDialogSafely(modelSelectionDialog);
     }
 
     private void showCustomModelInputDialog(CLIAgentManager.CLIAgent agent) {
         EditText input = new EditText(this);
         input.setHint("e.g. claude-3-7-sonnet, gemini-2.5-pro, o3-mini");
         String current = agentManager.getAgentModel(agent.id);
-        if (current != null) input.setText(current);
+        if (current != null && !"default".equalsIgnoreCase(current)) input.setText(current);
         input.setPadding(32, 24, 32, 24);
         input.setTextColor(0xFFFFFFFF);
         input.setHintTextColor(0xFF888888);
 
-        new AlertDialog.Builder(this)
+        showDialogSafely(new AlertDialog.Builder(this)
                 .setTitle("Custom Model for " + agent.name)
                 .setView(input)
                 .setPositiveButton("Set", (dialog, which) -> {
@@ -1256,15 +1643,14 @@ public class AgentChatActivity extends AppCompatActivity {
                         Toast.makeText(this, "Model changed to " + val, Toast.LENGTH_SHORT).show();
                     }
                 })
-                .setNegativeButton("Cancel", null)
-                .show();
+                .setNegativeButton("Cancel", null));
     }
 
     private void showThinkingLevelSelectionDialog() {
         CLIAgentManager.CLIAgent agent = selectedAgent();
         if (agent == null) return;
 
-        List<String> levels = agentManager.getAvailableThinkingLevels();
+        List<String> levels = agentManager.getAvailableThinkingLevels(agent.id);
         String currentLevel = agentManager.getAgentThinkingLevel(agent.id);
 
         String[] labels = new String[levels.size()];
@@ -1277,7 +1663,7 @@ public class AgentChatActivity extends AppCompatActivity {
             }
         }
 
-        new AlertDialog.Builder(this)
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
                 .setTitle("🧠 Thinking Budget (" + agent.name + ")")
                 .setSingleChoiceItems(labels, selectedIndex, (dialog, which) -> {
                     String selected = levels.get(which);
@@ -1286,8 +1672,31 @@ public class AgentChatActivity extends AppCompatActivity {
                     Toast.makeText(this, "Thinking set to " + selected, Toast.LENGTH_SHORT).show();
                     dialog.dismiss();
                 })
-                .setNegativeButton("Cancel", null)
-                .show();
+                .setNegativeButton("Cancel", null);
+        if (agent.id.equals("opencode")) {
+            // Linked mode applies the level as the model's server variant.
+            // Say up front what this model supports, so a level that cannot
+            // apply is never a silent surprise later.
+            String sel = agentManager.getAgentModel(agent.id);
+            String effectiveModel = (sel == null || sel.equals("default"))
+                    ? agentManager.getCachedRealModel(agent.id) : sel;
+            java.util.List<String> known = agentManager.getModelVariants(effectiveModel);
+            String modelName = effectiveModel == null ? "The current model" : effectiveModel;
+            if (known == null) {
+                builder.setMessage("OpenCode applies thinking as the model's server variant. "
+                        + "Variant support for " + modelName + " has not been fetched yet — "
+                        + "open the model picker once and tap Query / Refresh.");
+            } else if (known.isEmpty()) {
+                builder.setMessage(modelName + " exposes no thinking variants — any level "
+                        + "picked here is saved, but prompts are sent without a variant and "
+                        + "the model reasons at its own default.");
+            } else {
+                builder.setMessage(modelName + " offers these thinking variants: "
+                        + TextUtils.join(", ", known) + ". Levels that don't map to one of "
+                        + "these are not sent.");
+            }
+        }
+        showDialogSafely(builder);
     }
 
     // ------------------------------------------------------------------
@@ -1308,7 +1717,7 @@ public class AgentChatActivity extends AppCompatActivity {
                 "📄  Tag Project File (@file)",
                 "🖼️  Tag Workspace Image"
         };
-        new AlertDialog.Builder(this)
+        showDialogSafely(new AlertDialog.Builder(this)
                 .setTitle("Attachments & Tags")
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
@@ -1319,8 +1728,7 @@ public class AgentChatActivity extends AppCompatActivity {
                         showWorkspaceImagePickerDialog();
                     }
                 })
-                .setNegativeButton("Cancel", null)
-                .show();
+                .setNegativeButton("Cancel", null));
     }
 
     private void handleImagePicked(Uri uri) {
@@ -1446,7 +1854,7 @@ public class AgentChatActivity extends AppCompatActivity {
             dialog.dismiss();
         });
 
-        dialog.show();
+        showDialogSafely(dialog);
     }
 
     private void showWorkspaceImagePickerDialog() {
@@ -1460,12 +1868,11 @@ public class AgentChatActivity extends AppCompatActivity {
         collectProjectImages(root, root, imageList, 150);
 
         if (imageList.isEmpty()) {
-            new AlertDialog.Builder(this)
+            showDialogSafely(new AlertDialog.Builder(this)
                     .setTitle("No Workspace Images")
                     .setMessage("No image files found in the current workspace. Pick a photo from device storage instead?")
                     .setPositiveButton("Pick Photo", (d, w) -> launchPhotoPicker())
-                    .setNegativeButton("Cancel", null)
-                    .show();
+                    .setNegativeButton("Cancel", null));
             return;
         }
 
@@ -1550,7 +1957,7 @@ public class AgentChatActivity extends AppCompatActivity {
             dialog.dismiss();
         });
 
-        dialog.show();
+        showDialogSafely(dialog);
     }
 
     private void collectProjectImages(File root, File current, List<String> result, int maxFiles) {

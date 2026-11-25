@@ -18,6 +18,16 @@ public class AIChatManager {
     private final CLIAgentManager cliAgentManager;
     private boolean hasLaunchedInitialAgent = false;
 
+    /**
+     * agentId -> when its install command was last sent to a terminal session.
+     * An install command is sent ONCE: never for an already-installed agent,
+     * and never re-sent while a previous send is still fresh (install running
+     * or terminal already open with it). After the window a manual retry is
+     * allowed again (the earlier install may have failed).
+     */
+    private static final java.util.Map<String, Long> INSTALL_SENT_AT = new java.util.HashMap<>();
+    private static final long INSTALL_RESEND_WINDOW_MS = 20 * 60 * 1000L;
+
     public AIChatManager(TermuxActivity activity) {
         this.activity = activity;
         this.cliAgentManager = new CLIAgentManager(activity);
@@ -102,7 +112,18 @@ public class AIChatManager {
                     String cmd = cliAgentManager.buildLaunchCommand(agent, "", workspace);
                     
                     if (isInitial) {
-                        currentSession.write("clear && " + cmd + "\r\n");
+                        // Running-agent check: on activity recreation /
+                        // terminal reopen this "initial" launch fires again
+                        // while the agent's TUI is still live in the session —
+                        // typing the start command would land inside that TUI.
+                        // The check reads live /proc state, so a dead agent
+                        // (no process) still starts normally.
+                        String runningId = currentSession.getPid() > 0
+                                ? CLIAgentManager.findRunningAgentIdForSessionPid(currentSession.getPid())
+                                : null;
+                        if (runningId == null) {
+                            currentSession.write("clear && " + cmd + "\r\n");
+                        }
                     } else {
                         // Create a NEW session for the new agent
                         activity.getTermuxTerminalSessionClient().addNewSession(false, agent.name);
@@ -130,9 +151,17 @@ public class AIChatManager {
                                     checkRetries++;
                                     handler.postDelayed(this, 100);
                                 } else {
-                                    // Fallback: just try to kill current foreground and run
-                                    currentSession.write("\003\004");
-                                    currentSession.write("clear && " + cmd + "\r\n");
+                                    // Fallback: kill current foreground and run —
+                                    // but NEVER inject ^C/^D + a start command
+                                    // into a session where an agent TUI is live;
+                                    // that is exactly the reopen garbling bug.
+                                    String runningId = currentSession.getPid() > 0
+                                            ? CLIAgentManager.findRunningAgentIdForSessionPid(currentSession.getPid())
+                                            : null;
+                                    if (runningId == null) {
+                                        currentSession.write("\003\004");
+                                        currentSession.write("clear && " + cmd + "\r\n");
+                                    }
                                 }
                             }
                         }, 100);
@@ -148,6 +177,20 @@ public class AIChatManager {
     public void installAgent(String agentId) {
         for (CLIAgentManager.CLIAgent agent : CLIAgentManager.AGENTS) {
             if (agent.id.equals(agentId) && agent.installCommand != null && !agent.installCommand.isEmpty()) {
+                // One-time only: already installed -> never send the command again.
+                if (cliAgentManager.isAgentInstalled(agent)) {
+                    break;
+                }
+                // Already sent recently (install in flight / terminal open with
+                // it) -> do not send a duplicate into another session.
+                long now = System.currentTimeMillis();
+                synchronized (INSTALL_SENT_AT) {
+                    Long last = INSTALL_SENT_AT.get(agentId);
+                    if (last != null && now - last < INSTALL_RESEND_WINDOW_MS) {
+                        break;
+                    }
+                    INSTALL_SENT_AT.put(agentId, now);
+                }
                 activity.getTermuxTerminalSessionClient().addNewSession(false, "Install " + agent.name);
                 Handler handler = new Handler(Looper.getMainLooper());
                 handler.postDelayed(() -> {

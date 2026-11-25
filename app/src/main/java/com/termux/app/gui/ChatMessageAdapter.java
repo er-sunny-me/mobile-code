@@ -83,6 +83,12 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         }
     }
 
+    /** Re-render one already-added message in place (live streaming updates). */
+    public void refreshMessage(ChatMessage message) {
+        int idx = messages.indexOf(message);
+        if (idx >= 0) notifyItemChanged(idx);
+    }
+
     /**
      * Mark the most recent agent message as an error if the process exited with a failure.
      */

@@ -62,6 +62,18 @@ public final class TermuxInstaller {
 
     private static final String LOG_TAG = "TermuxInstaller";
 
+    /**
+     * Guards against concurrent bootstrap installs. TermuxActivity and the
+     * first-run setup wizard both call {@link #setupBootstrapIfNeeded} on first
+     * launch; two extraction threads would delete each other's staging/prefix
+     * directories and one could rename a half-built staging tree into place.
+     * While an install runs, later callers are queued and run when it finishes
+     * successfully (dropped on failure — the error dialog offers retry).
+     */
+    private static final java.util.concurrent.atomic.AtomicBoolean sInstallInProgress =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private static final java.util.List<Runnable> sPendingCallbacks = new java.util.ArrayList<>();
+
     /** Performs bootstrap setup if necessary. */
     public static void setupBootstrapIfNeeded(final Activity activity, final Runnable whenDone) {
         String bootstrapErrorMessage;
@@ -103,6 +115,15 @@ public final class TermuxInstaller {
             return;
         }
 
+        // Another install is already extracting: queue instead of starting a
+        // second one or early-returning on the half-built prefix directory.
+        synchronized (sPendingCallbacks) {
+            if (sInstallInProgress.get()) {
+                sPendingCallbacks.add(whenDone);
+                return;
+            }
+        }
+
         // If prefix directory exists, even if its a symlink to a valid directory and symlink is not broken/dangling
         if (FileUtils.directoryFileExists(TERMUX_PREFIX_DIR_PATH, true)) {
             if (TermuxFileUtils.isTermuxPrefixDirectoryEmpty()) {
@@ -116,7 +137,10 @@ public final class TermuxInstaller {
         }
 
         final ProgressDialog progress = ProgressDialog.show(activity, null, activity.getString(R.string.bootstrap_installer_body), true, false);
+        sInstallInProgress.set(true);
         new Thread() {
+            private boolean installSucceeded = false;
+
             @Override
             public void run() {
                 try {
@@ -222,12 +246,31 @@ public final class TermuxInstaller {
                     // Recreate env file since termux prefix was wiped earlier
                     TermuxShellEnvironment.writeEnvironmentToFile(activity);
 
+                    installSucceeded = true;
                     activity.runOnUiThread(whenDone);
 
                 } catch (final Exception e) {
                     showBootstrapErrorDialog(activity, whenDone, Logger.getStackTracesMarkdownString(null, Logger.getStackTracesStringArray(e)));
 
                 } finally {
+                    // Release the install guard and run any callbacks queued by
+                    // concurrent setupBootstrapIfNeeded callers (success only).
+                    sInstallInProgress.set(false);
+                    final java.util.List<Runnable> pending;
+                    synchronized (sPendingCallbacks) {
+                        pending = new java.util.ArrayList<>(sPendingCallbacks);
+                        sPendingCallbacks.clear();
+                    }
+                    if (installSucceeded && !pending.isEmpty()) {
+                        activity.runOnUiThread(() -> {
+                            for (Runnable queued : pending) {
+                                try {
+                                    queued.run();
+                                } catch (Exception ignored) {
+                                }
+                            }
+                        });
+                    }
                     activity.runOnUiThread(() -> {
                         try {
                             progress.dismiss();

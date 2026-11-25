@@ -402,4 +402,237 @@ public class CLIAgentManagerTest {
         assertNotNull(CLIAgentManager.buildModelProbeCommand(CLIAgentManager.findAgent("codex")));
         assertNotNull(CLIAgentManager.buildModelProbeCommand(CLIAgentManager.findAgent("opencode")));
     }
+
+    @Test
+    public void defaultModelIsAlwaysTheCliOwnDefault() {
+        // Regression (device screenshot, OpenCode): the app invented per-agent
+        // model ids — "deepseek-r1" for OpenCode — and forced them via
+        // --model, while the CLI's own list/default was a different model.
+        // "Default" must be the no---model sentinel for EVERY agent.
+        for (CLIAgentManager.CLIAgent agent : CLIAgentManager.AGENTS) {
+            assertEquals("default", CLIAgentManager.defaultModelForAgent(agent.id));
+        }
+        assertEquals("default", CLIAgentManager.defaultModelForAgent(null));
+        assertEquals("default", CLIAgentManager.defaultModelForAgent("unknown_agent"));
+    }
+
+    @Test
+    public void thinkingOnlySupportedWhereTheGuiCommandAppliesIt() {
+        assertTrue(CLIAgentManager.isThinkingSupported("claude_code"));
+        assertTrue(CLIAgentManager.isThinkingSupported("antigravity"));
+        assertTrue(CLIAgentManager.isThinkingSupported("codex"));
+        // OpenCode became supported when its GUI mode went LINKED: the level
+        // is sent to the server as the prompt's `variant` field, resolved
+        // against the model's own variant names (see OpenCodeLinkTest).
+        assertTrue(CLIAgentManager.isThinkingSupported("opencode"));
+        // These CLIs get no thinking flag/env/variant from the GUI at all,
+        // so a non-Off level for them was a chip that lied.
+        assertFalse(CLIAgentManager.isThinkingSupported("grok"));
+        assertFalse(CLIAgentManager.isThinkingSupported("kiro"));
+        assertFalse(CLIAgentManager.isThinkingSupported("kilo"));
+        assertFalse(CLIAgentManager.isThinkingSupported("github_copilot"));
+        assertFalse(CLIAgentManager.isThinkingSupported("custom"));
+        assertFalse(CLIAgentManager.isThinkingSupported(null));
+    }
+
+    @Test
+    public void thinkingLevelsForUnsupportedAgentsAreOffOnly() {
+        assertEquals(java.util.Collections.singletonList("Off"),
+                CLIAgentManager.getAvailableThinkingLevels("grok"));
+        assertEquals(CLIAgentManager.THINKING_LEVELS,
+                CLIAgentManager.getAvailableThinkingLevels("claude_code"));
+        assertEquals(CLIAgentManager.THINKING_LEVELS,
+                CLIAgentManager.getAvailableThinkingLevels("opencode"));
+    }
+
+    // ------------------------------------------------------------------
+    // Real default model fetch: values come from the CLI's own config /
+    // state files, parsed exactly — a wrong parse here would put a wrong
+    // model name on the chip, which is the glitch being fixed.
+    // ------------------------------------------------------------------
+
+    @Test
+    public void jsonStringFieldParsesConfigModel() {
+        String config = "{\n  \"$schema\": \"https://opencode.ai/config.json\",\n"
+                + "  \"model\": \"opencode/deepseek-v4.1-flash-free\",\n  \"theme\": \"dark\"\n}";
+        assertEquals("opencode/deepseek-v4.1-flash-free",
+                CLIAgentManager.parseJsonStringField(config, "model"));
+        assertEquals(null, CLIAgentManager.parseJsonStringField(config, "small_model"));
+        assertEquals(null, CLIAgentManager.parseJsonStringField(null, "model"));
+        assertEquals(null, CLIAgentManager.parseJsonStringField("", "model"));
+    }
+
+    @Test
+    public void opencodeRecentModelComesFromTheRecentArray() {
+        // Shape of ~/.local/state/opencode/model.json as written by the TUI.
+        String state = "{\"favorite\":[{\"providerID\":\"opencode\",\"modelID\":\"gpt-5-nano\"}],"
+                + "\"recent\":[{\"providerID\":\"opencode\",\"modelID\":\"big-pickle\"},"
+                + "{\"providerID\":\"opencode\",\"modelID\":\"deepseek-v4.1-flash-free\"}],"
+                + "\"variant\":{}}";
+        assertEquals("opencode/big-pickle", CLIAgentManager.parseOpencodeRecentModel(state));
+        // No recent array -> nothing to report (a favourite is NOT a default).
+        assertEquals(null, CLIAgentManager.parseOpencodeRecentModel(
+                "{\"favorite\":[{\"providerID\":\"opencode\",\"modelID\":\"gpt-5-nano\"}]}"));
+        assertEquals(null, CLIAgentManager.parseOpencodeRecentModel(null));
+        assertEquals(null, CLIAgentManager.parseOpencodeRecentModel("not json"));
+    }
+
+    @Test
+    public void opencodeDefaultResolutionFollowsTheClisOwnPriority() {
+        // Config beats last-used beats built-in; the built-in free default
+        // (opencode/big-pickle) applies only with no provider connected.
+        assertEquals("anthropic/claude-sonnet-4",
+                CLIAgentManager.resolveOpencodeDefaultModel(
+                        "anthropic/claude-sonnet-4", "opencode/big-pickle", true));
+        assertEquals("opencode/big-pickle",
+                CLIAgentManager.resolveOpencodeDefaultModel(null, "opencode/big-pickle", true));
+        assertEquals("opencode/big-pickle",
+                CLIAgentManager.resolveOpencodeDefaultModel(null, null, false));
+        assertEquals(null,
+                CLIAgentManager.resolveOpencodeDefaultModel(null, null, true));
+    }
+
+    @Test
+    public void codexTomlModelIsTopLevelOnly() {
+        String config = "# codex config\nmodel = \"gpt-5-codex\"\nmodel_provider = \"openai\"\n\n"
+                + "[profiles.work]\nmodel = \"gpt-5\"\n";
+        assertEquals("gpt-5-codex", CLIAgentManager.parseCodexTomlModel(config));
+        // A model that only exists inside a profile section is not the default.
+        assertEquals(null, CLIAgentManager.parseCodexTomlModel(
+                "model_provider = \"openai\"\n[profiles.work]\nmodel = \"gpt-5\"\n"));
+        assertEquals(null, CLIAgentManager.parseCodexTomlModel(null));
+        assertEquals(null, CLIAgentManager.parseCodexTomlModel(""));
+    }
+
+    // ------------------------------------------------------------------
+    // Running-agent check: the reopen guard stands or falls on matching
+    // the agent's process without false positives.
+    // ------------------------------------------------------------------
+
+    @Test
+    public void cmdlineMatchingFindsAgentProcesses() {
+        assertEquals("opencode", CLIAgentManager.matchAgentInCmdline(
+                "/root/.opencode/bin/opencode\u0000"));
+        assertEquals("claude_code", CLIAgentManager.matchAgentInCmdline(
+                "node\u0000/root/.nvm/versions/node/v22/lib/node_modules/@anthropic-ai/claude-code/cli.js\u0000"));
+        assertEquals("github_copilot", CLIAgentManager.matchAgentInCmdline(
+                "npx\u0000-y\u0000@github/copilot\u0000"));
+        assertEquals("codex", CLIAgentManager.matchAgentInCmdline(
+                "/usr/local/bin/codex\u0000"));
+        assertEquals("antigravity", CLIAgentManager.matchAgentInCmdline(
+                "/root/.local/bin/agy\u0000"));
+    }
+
+    @Test
+    public void cmdlineMatchingIgnoresShellsAndLookalikeArgs() {
+        // argv[0] decides: a grep FOR opencode is not the agent running.
+        assertEquals(null, CLIAgentManager.matchAgentInCmdline("grep\u0000opencode\u0000file.txt\u0000"));
+        assertEquals(null, CLIAgentManager.matchAgentInCmdline("bash\u0000"));
+        assertEquals(null, CLIAgentManager.matchAgentInCmdline("-bash\u0000"));
+        assertEquals(null, CLIAgentManager.matchAgentInCmdline("proot\u0000--rootfs=/data/data/com.xyzide/files/usr/var/lib/proot-distro/containers/ubuntu/rootfs\u0000"));
+        assertEquals(null, CLIAgentManager.matchAgentInCmdline(null));
+        assertEquals(null, CLIAgentManager.matchAgentInCmdline(""));
+    }
+
+    // ------------------------------------------------------------------
+    // Live model list: OpenCode prints full provider/model ids, one per
+    // line. The old parser kept only the part after the last '/' and only
+    // when it started with deepseek/claude/gpt/gemini/o1/o3, so from the
+    // device-verified list below exactly ONE model survived
+    // (deepseek-v4.1-flash-free) — and even that one lost its prefix.
+    // ------------------------------------------------------------------
+
+    /** `opencode models` output as seen on X's phone (the TUI's free-model
+     * list) plus the usual connected providers. */
+    private static final String OPENCODE_MODELS_SAMPLE =
+            "opencode/big-pickle\n" +
+            "opencode/hy4-flash-free\n" +
+            "opencode/iceman-free\n" +
+            "opencode/inkling-2-small-free\n" +
+            "opencode/longcat-2.5-free\n" +
+            "opencode/flint-40b-free\n" +
+            "opencode/deepseek-v4.1-flash-free\n" +
+            "opencode/nemotron-3.5-super-vl-free\n" +
+            "opencode/beam-free\n" +
+            "opencode/mimo-v2.6-flash-free\n" +
+            "opencode/glm-5.3-flash-free\n" +
+            "anthropic/claude-sonnet-4-5\n" +
+            "openai/gpt-5\n" +
+            "google/gemini-2.5-pro\n";
+
+    @Test
+    public void opencodeParserKeepsTheFullProviderModelList() {
+        java.util.List<String> parsed =
+                CLIAgentManager.parseModelsFromCliOutput("opencode", OPENCODE_MODELS_SAMPLE);
+        assertEquals(14, parsed.size());
+        // CLI order preserved, ids kept whole (provider prefix included).
+        assertEquals("opencode/big-pickle", parsed.get(0));
+        assertTrue(parsed.contains("opencode/hy4-flash-free"));
+        assertTrue(parsed.contains("opencode/iceman-free"));
+        assertTrue(parsed.contains("opencode/inkling-2-small-free"));
+        assertTrue(parsed.contains("opencode/longcat-2.5-free"));
+        assertTrue(parsed.contains("opencode/flint-40b-free"));
+        assertTrue(parsed.contains("opencode/deepseek-v4.1-flash-free"));
+        assertTrue(parsed.contains("opencode/nemotron-3.5-super-vl-free"));
+        assertTrue(parsed.contains("opencode/beam-free"));
+        assertTrue(parsed.contains("opencode/mimo-v2.6-flash-free"));
+        assertTrue(parsed.contains("opencode/glm-5.3-flash-free"));
+        assertTrue(parsed.contains("anthropic/claude-sonnet-4-5"));
+        assertTrue(parsed.contains("openai/gpt-5"));
+        assertTrue(parsed.contains("google/gemini-2.5-pro"));
+        // No stripped duplicates of the part after the slash.
+        assertFalse(parsed.contains("big-pickle"));
+        assertFalse(parsed.contains("deepseek-v4.1-flash-free"));
+        assertFalse(parsed.contains("gpt-5"));
+        assertFalse(parsed.contains("gemini-2.5-pro"));
+    }
+
+    @Test
+    public void kiloParserAlsoKeepsProviderModelIds() {
+        java.util.List<String> parsed = CLIAgentManager.parseModelsFromCliOutput(
+                "kilo", "kilo/kilo-code-free\nopencode/deepseek-v4.1-flash-free\n");
+        assertTrue(parsed.contains("kilo/kilo-code-free"));
+        assertTrue(parsed.contains("opencode/deepseek-v4.1-flash-free"));
+    }
+
+    @Test
+    public void providerModelIdCheckRejectsPathFragments() {
+        assertTrue(CLIAgentManager.looksLikeProviderModelId("opencode/big-pickle"));
+        assertTrue(CLIAgentManager.looksLikeProviderModelId("anthropic/claude-sonnet-4-5"));
+        assertTrue(CLIAgentManager.looksLikeProviderModelId("openrouter/openai/gpt-5"));
+        // Help-text path fragments are not models.
+        assertFalse(CLIAgentManager.looksLikeProviderModelId("config/opencode"));
+        assertFalse(CLIAgentManager.looksLikeProviderModelId("usr/bin"));
+        assertFalse(CLIAgentManager.looksLikeProviderModelId("data/data"));
+        assertFalse(CLIAgentManager.looksLikeProviderModelId("opencode/opencode"));
+        assertFalse(CLIAgentManager.looksLikeProviderModelId("opencode/config.json"));
+        assertFalse(CLIAgentManager.looksLikeProviderModelId("noslash"));
+        assertFalse(CLIAgentManager.looksLikeProviderModelId(null));
+    }
+
+    @Test
+    public void opencodeParserIgnoresHelpTextNoise() {
+        String help = "Usage: opencode [options] [command]\n" +
+                "Config: ~/.config/opencode/opencode.json\n" +
+                "Run opencode models to list models.\n" +
+                "opencode/big-pickle\n";
+        java.util.List<String> parsed =
+                CLIAgentManager.parseModelsFromCliOutput("opencode", help);
+        assertTrue(parsed.contains("opencode/big-pickle"));
+        assertFalse(parsed.contains("config/opencode"));
+        assertFalse(parsed.contains("opencode/opencode"));
+        assertFalse(parsed.contains("opencode.json"));
+    }
+
+    @Test
+    public void descendantCollectionWalksTheWholeTreeOnly() {
+        java.util.Map<Integer, java.util.List<Integer>> tree = new java.util.HashMap<>();
+        tree.put(100, java.util.Arrays.asList(200, 201));
+        tree.put(200, java.util.Arrays.asList(300));
+        tree.put(300, java.util.Arrays.asList(400));
+        tree.put(999, java.util.Arrays.asList(100)); // unrelated branch pointing in
+        java.util.Set<Integer> found = CLIAgentManager.collectDescendantPids(100, tree);
+        assertEquals(new HashSet<>(java.util.Arrays.asList(200, 201, 300, 400)), found);
+        assertTrue(CLIAgentManager.collectDescendantPids(555, tree).isEmpty());
+    }
 }

@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.termux.R;
+import com.termux.app.RepoCompatInstaller;
 import com.termux.app.TermuxInstaller;
 import com.termux.app.terminal.CLIAgentManager;
 import com.termux.shared.termux.TermuxConstants;
@@ -133,9 +134,9 @@ public class SetupWizardActivity extends AppCompatActivity {
         steps.add(new SetupStep(STEP_BOOTSTRAP, "Termux base system",
                 "Core shell, pkg manager and tools."));
         steps.add(new SetupStep(STEP_DISTRO, "Linux system",
-                "Ubuntu is bundled in the app — instant. Debian/Alpine download on demand."));
+                "Ubuntu is bundled in the app — instant. Debian/Alpine download on demand. Agents download once on first setup."));
         steps.add(new SetupStep(STEP_AGENTS, "Coding agents",
-                "agy, opencode, grok, kiro + npm agents (Claude, Codex, Copilot, Kilo)."));
+                "agy, opencode, grok, kiro + npm agents (Claude, Codex, Copilot, Kilo). None are selected by default — tick the ones you want."));
         adapter.setItems(steps);
         refreshDistroButtons();
 
@@ -223,7 +224,7 @@ public class SetupWizardActivity extends AppCompatActivity {
     // ------------------------------------------------------------------
 
     private void refreshDistroButtons() {
-        paintDistro((TextView) distroUbuntu, "ubuntu".equals(selectedDistro), "Ubuntu ★ bundled");
+        paintDistro((TextView) distroUbuntu, "ubuntu".equals(selectedDistro), "Ubuntu ★ recommended");
         paintDistro((TextView) distroDebian, "debian".equals(selectedDistro), "Debian");
         paintDistro((TextView) distroAlpine, "alpine".equals(selectedDistro), "Alpine");
         String detail;
@@ -267,8 +268,14 @@ public class SetupWizardActivity extends AppCompatActivity {
                     : WorkshopBundleInstaller.bundledAgentKey(agent.id, arch);
             boolean bundled = manifest != null && key != null
                     && manifest.getProperty(key + ".file") != null;
-            rows.add(new SetupAgentAdapter.Row(agent,
-                    cliManager.isAgentEnabled(agent.id), bundled));
+            // NO agent is pre-selected on the welcome screen — the user ticks
+            // the agents he wants himself. Rows therefore start unchecked,
+            // deliberately NOT seeded from isAgentEnabled(): that flag
+            // defaults to true for every agent, but it governs visibility in
+            // the chat/dashboard pickers, not the install choice here. The
+            // toggle listener still syncs explicit user ticks into
+            // setAgentEnabled, so a choice made here sticks everywhere.
+            rows.add(new SetupAgentAdapter.Row(agent, false, bundled));
         }
         agentAdapter.setItems(rows);
         // Fill in already-installed ticks off the main thread (shell probe).
@@ -353,6 +360,7 @@ public class SetupWizardActivity extends AppCompatActivity {
     private void startSetup() {
         running.set(true);
         cancelled.set(false);
+        ensureHomeDir();
         runOnUiThread(() -> {
             btnStart.setText("Working…");
             btnStart.setEnabled(false);
@@ -484,11 +492,90 @@ public class SetupWizardActivity extends AppCompatActivity {
     }
 
     /**
+     * Create $HOME (and $PREFIX/tmp) when missing. Nothing in the installer flow
+     * creates $HOME — TermuxActivity normally does it during its own startup, but
+     * the wizard runs BEFORE TermuxActivity on first launch, and a partial/old
+     * install can leave $HOME absent while a prefix exists. A missing $HOME is
+     * fatal for every shell step: ProcessBuilder refuses to start bash with
+     * error=2 ("No such file or directory") naming the *bash* path and the
+     * missing "(in directory …/home)", even though bash itself is fine.
+     */
+    private boolean ensureHomeDir() {
+        try {
+            File home = new File(TermuxConstants.TERMUX_HOME_DIR_PATH);
+            if (!home.isDirectory()) home.mkdirs();
+            File tmp = new File(TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/tmp");
+            if (!tmp.isDirectory()) tmp.mkdirs();
+            return home.isDirectory();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Verify the shell by ACTUALLY executing it — a file-exists check is not
+     * proof the shell can run (missing $HOME working dir, half-renamed prefix
+     * from a concurrent installer, etc. all pass isFile() but fail execve).
+     */
+    private boolean shellActuallyRuns() {
+        String bash = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/bash";
+        if (!new File(bash).isFile()) return false;
+        ensureHomeDir();
+        Process process = null;
+        try {
+            ProcessBuilder pb = new ProcessBuilder(bash, "-c", "echo xyzide-shell-ok");
+            File home = new File(homePath());
+            if (home.isDirectory()) pb.directory(home);
+            pb.environment().put("PREFIX", TermuxConstants.TERMUX_PREFIX_DIR_PATH);
+            pb.environment().put("HOME", TermuxConstants.TERMUX_HOME_DIR_PATH);
+            pb.environment().put("PATH", TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/"
+                    + ":" + TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/applets");
+            pb.environment().put("LD_LIBRARY_PATH", TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/lib");
+            pb.environment().put("TMPDIR", TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/tmp");
+            pb.redirectErrorStream(true);
+            process = pb.start();
+            final Process watchdogTarget = process;
+            Thread watchdog = new Thread(() -> {
+                try {
+                    Thread.sleep(20000);
+                    watchdogTarget.destroy();
+                } catch (Exception ignored) {
+                }
+            }, "shell-probe-watchdog");
+            watchdog.setDaemon(true);
+            watchdog.start();
+            StringBuilder out = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    out.append(line).append('\n');
+                }
+            }
+            return process.waitFor() == 0 && out.toString().contains("xyzide-shell-ok");
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (process != null) {
+                try {
+                    process.destroy();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    /** Ready = bash file present AND a real exec of it succeeds. */
+    private boolean shellReady() {
+        return isBootstrapReady() && shellActuallyRuns();
+    }
+
+    /**
      * Wipe a broken prefix (shell missing) and reinstall the bootstrap, then verify.
      * Safe: only wipes when the shell is actually unusable; never touches $HOME.
      */
     private boolean repairBootstrapIfBroken() {
-        if (isBootstrapReady()) return true;
+        if (shellReady()) return true;
         appendLog("Base system is incomplete (shell missing) — wiping and reinstalling…");
         try {
             com.termux.shared.errors.Error wipeError = com.termux.shared.file.FileUtils.deleteFile(
@@ -517,14 +604,31 @@ public class SetupWizardActivity extends AppCompatActivity {
             return false;
         }
         if (cancelled.get()) return false;
-        boolean ready = ok.get() || isBootstrapReady();
+        // "Verified" must mean the shell really executes — the old file-exists
+        // check declared success and the very next step then died with
+        // "Cannot run program …/bin/bash … error=2" (missing $HOME cwd).
+        // Probe with retries: filesystem state can settle a moment after the
+        // installer's rename of staging -> prefix.
+        boolean ready = false;
+        for (int attempt = 0; attempt < 10 && !cancelled.get(); attempt++) {
+            if (shellReady()) {
+                ready = true;
+                break;
+            }
+            try {
+                Thread.sleep(1500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
         appendLog(ready ? "Base system: repaired and verified."
                 : "Base system reinstall failed — check internet and retry.");
         return ready;
     }
 
     private boolean doBootstrapStep(SetupStep step) {
-        if (isBootstrapReady()) {
+        if (shellReady()) {
             step.detail = "Already installed.";
             appendLog("Base system: already installed.");
             return true;
@@ -542,8 +646,8 @@ public class SetupWizardActivity extends AppCompatActivity {
 
     private boolean doDistroStep(SetupStep step) {
         // The shell may have broken after the bootstrap step (or the wizard was
-        // re-run) — never attempt shell work without a verified shell.
-        if (!isBootstrapReady() && !repairBootstrapIfBroken()) {
+        // re-run) — never attempt shell work without a verified, executing shell.
+        if (!repairBootstrapIfBroken()) {
             step.detail = "Base system is broken. Fix it above, then Retry.";
             return false;
         }
@@ -558,9 +662,7 @@ public class SetupWizardActivity extends AppCompatActivity {
 
         // 1. proot-distro package itself (small, needs network once).
         appendLog("Linux system: ensuring proot-distro…");
-        ShellResult pkg = execTermux(
-                "command -v proot-distro >/dev/null 2>&1 || pkg install -y proot-distro",
-                homePath());
+        ShellResult pkg = ensureProotDistro();
         if (pkg.exit != 0 || cancelled.get()) {
             step.detail = "Could not install proot-distro (network needed). Tap Retry.";
             appendLog("proot-distro package install failed. Check internet and retry.");
@@ -605,8 +707,41 @@ public class SetupWizardActivity extends AppCompatActivity {
         return false;
     }
 
+    /**
+     * Install the proot-distro Termux package, working around the ncurses pin
+     * that killed plain {@code pkg install -y proot-distro} on real devices:
+     * an older ncurses-utils (left by an earlier partial install, or served by
+     * a stale mirror) declares {@code Depends: ncurses (= 6.5.20240831-3)}
+     * while the bootstrap/repo ncurses is a newer 6.6.x, so apt refuses with
+     * "you have held broken packages". Naming ncurses + ncurses-utils in the
+     * SAME install transaction makes apt move the pair to the repo's matching
+     * versions together, which dissolves the pin. (A full {@code pkg upgrade}
+     * would also work but downloads/upgrades everything — far more destructive
+     * on a first setup.) Idempotent: when proot-distro is already present the
+     * {@code command -v} guard short-circuits, and after a half-failed attempt
+     * one repair pass ({@code dpkg --configure -a}) runs before retrying.
+     *
+     * <p>Second, deeper failure fixed in the same place: even with the pin
+     * gone, dpkg could not unpack ANY repo .deb in this app — every upstream
+     * .deb's tree starts with {@code ./data/data/com.termux/} and dpkg died
+     * with "error creating directory './data/data/com.termux': Permission
+     * denied" (this app is com.xyzide; Android will not let it create the
+     * com.termux directory). {@link RepoCompatInstaller} installs the
+     * translation layer (apt -&gt; dpkg wrapper) that rewrites .debs into the
+     * com.xyzide tree before unpack; it must be in place before pkg runs.
+     */
+    private ShellResult ensureProotDistro() {
+        RepoCompatInstaller.ensureInstalled();
+        String install = "command -v proot-distro >/dev/null 2>&1"
+                + " || pkg install -y ncurses ncurses-utils proot-distro";
+        ShellResult first = execTermux(install, homePath());
+        if (first.exit == 0 || cancelled.get()) return first;
+        appendLog("proot-distro install hit a package problem — repairing and retrying once…");
+        return execTermux("dpkg --configure -a >/dev/null 2>&1; " + install, homePath());
+    }
+
     private boolean doAgentsStep(SetupStep step) {
-        if (!isBootstrapReady() && !repairBootstrapIfBroken()) {
+        if (!repairBootstrapIfBroken()) {
             step.detail = "Base system is broken. Fix it above, then Retry.";
             return false;
         }
@@ -737,9 +872,16 @@ public class SetupWizardActivity extends AppCompatActivity {
         }
         try {
             ProcessBuilder pb = new ProcessBuilder(bash, "-lc", command);
+            // The working directory MUST exist or ProcessBuilder.start() throws
+            // error=2 naming bash — the old fallback re-used the same (missing)
+            // home path, so it never saved us. Create $HOME, and if that fails
+            // fall back to a directory that really exists.
+            ensureHomeDir();
             File dir = new File(cwd);
-            if (!dir.isDirectory()) dir = new File(homePath());
-            pb.directory(dir);
+            if (!dir.isDirectory()) dir.mkdirs();
+            if (!dir.isDirectory()) dir = new File(TermuxConstants.TERMUX_PREFIX_DIR_PATH);
+            if (!dir.isDirectory()) dir = new File(homePath()).getParentFile();
+            if (dir != null && dir.isDirectory()) pb.directory(dir);
             pb.environment().put("PREFIX", TermuxConstants.TERMUX_PREFIX_DIR_PATH);
             pb.environment().put("HOME", TermuxConstants.TERMUX_HOME_DIR_PATH);
             pb.environment().put("PATH", TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/"
@@ -748,6 +890,14 @@ public class SetupWizardActivity extends AppCompatActivity {
             pb.environment().put("TMPDIR", TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/tmp");
             pb.environment().put("TERM", "xterm-256color");
             pb.environment().put("LANG", "en_US.UTF-8");
+            // Keep pkg on the bootstrap's default mirror (packages-cf.termux.dev,
+            // Cloudflare anycast, already in etc/apt/sources.list). Without this,
+            // pkg's select_mirror() tests EVERY mirror and picks one by weighted
+            // lottery — on a real device it picked a Chinese university mirror
+            // that served the Termux repo at 13.8 kB/s and with a stale index
+            // (the ncurses breakage above). pkg skips re-selection entirely when
+            // this is set and a current mirror exists (pkg script, termux-tools).
+            pb.environment().put("TERMUX_PKG_NO_MIRROR_SELECT", "1");
             pb.redirectErrorStream(true);
             Process process = pb.start();
             currentProcess = process;

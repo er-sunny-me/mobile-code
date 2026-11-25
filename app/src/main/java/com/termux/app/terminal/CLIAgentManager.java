@@ -3,6 +3,7 @@ package com.termux.app.terminal;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.termux.app.RepoCompatInstaller;
 import com.termux.shared.termux.TermuxConstants;
 
 import android.os.Handler;
@@ -17,6 +18,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -592,7 +594,11 @@ public class CLIAgentManager {
 
     public static final String KEY_AGENT_MODEL_PREFIX = "agent_model_";
     public static final String KEY_AGENT_THINKING_PREFIX = "agent_thinking_";
-    public static final String KEY_AGENT_LIVE_MODELS_PREFIX = "agent_live_models_";
+    // v2: the v1 cache can hold a 1-model list written by the old parser,
+    // which dropped almost every OpenCode model (see parseModelsFromCliOutput).
+    // Versioning the key makes those stale caches invisible; the next live
+    // query repopulates with the full list.
+    public static final String KEY_AGENT_LIVE_MODELS_PREFIX = "agent_live_models_v2_";
 
     public static final List<String> THINKING_LEVELS = Collections.unmodifiableList(
             Arrays.asList("Off", "Low (2k)", "Medium (8k)", "High (16k)", "Max (32k)")
@@ -602,11 +608,57 @@ public class CLIAgentManager {
         return THINKING_LEVELS;
     }
 
+    /**
+     * Thinking levels actually offered for one agent. Agents whose GUI command
+     * has no thinking channel (see {@link #isThinkingSupported}) only ever get
+     * "Off" — offering them a budget the app never applies made the chat chip
+     * lie (it showed e.g. "High (16k)" for OpenCode while nothing was passed
+     * to the CLI at all).
+     */
+    public static List<String> getAvailableThinkingLevels(String agentId) {
+        if (!isThinkingSupported(agentId)) {
+            return Collections.singletonList("Off");
+        }
+        return THINKING_LEVELS;
+    }
+
+    /**
+     * True when a thinking / reasoning setting really reaches this agent:
+     * Claude Code (thinking-budget env), Antigravity ({@code --thinking}),
+     * Codex ({@code --reasoning-effort}) — and OpenCode, whose GUI mode is
+     * the LINKED server session: the level is resolved to one of the
+     * selected model's own server {@code variant} names and sent as the
+     * prompt body's {@code variant} field (see {@link OpenCodeLink}); the
+     * one-shot fallback appends {@code --variant} when a name resolves.
+     * OpenCode was Off-only in the one-shot era because that command had no
+     * thinking channel at all. Every other CLI still has no channel, so its
+     * thinking level is always "Off" here.
+     */
+    public static boolean isThinkingSupported(String agentId) {
+        return "claude_code".equals(agentId)
+                || "antigravity".equals(agentId)
+                || "codex".equals(agentId)
+                || "opencode".equals(agentId);
+    }
+
+    /**
+     * The agent's thinking level. Default is "Off" for every agent: the old
+     * "High (16k)" fallback forced a 16k budget (Claude Code env) or a High
+     * chip on agents where nothing was applied at all, which is exactly the
+     * mismatch reported from a real device. "Off" is the only default where
+     * the label and what is applied always agree.
+     */
     public String getAgentThinkingLevel(String agentId) {
-        return prefs.getString(KEY_AGENT_THINKING_PREFIX + agentId, "High (16k)");
+        if (!isThinkingSupported(agentId)) return "Off";
+        return prefs.getString(KEY_AGENT_THINKING_PREFIX + agentId, "Off");
     }
 
     public void setAgentThinkingLevel(String agentId, String level) {
+        if (!isThinkingSupported(agentId)) {
+            // Never store a level the GUI command cannot apply.
+            prefs.edit().remove(KEY_AGENT_THINKING_PREFIX + agentId).apply();
+            return;
+        }
         prefs.edit().putString(KEY_AGENT_THINKING_PREFIX + agentId, level).apply();
     }
 
@@ -620,28 +672,28 @@ public class CLIAgentManager {
         return 8192;
     }
 
+    /**
+     * What "Default" means for an agent's model: the CLI's OWN default.
+     *
+     * <p>This used to return invented per-agent model ids ("deepseek-r1" for
+     * OpenCode, "claude-3-7-sonnet" for Claude Code, "o3-mini" for Codex…).
+     * Nothing in this app configures a model for any CLI — the install
+     * commands only install the binaries, no config file is ever written —
+     * so those ids were stale guesses, and {@link #buildGuiPromptCommand}
+     * then FORCED them onto every run via {@code --model} / the Anthropic
+     * env. On a real device OpenCode's own model list contained only its
+     * configured free model (deepseek-v4.1-flash-free) while the app showed
+     * and passed "deepseek-r1" — a model the CLI did not even offer.
+     *
+     * <p>Returning the {@code "default"} sentinel makes label, selection and
+     * behaviour agree: the picker shows "Default (CLI's own default)", and
+     * the command builders pass no {@code --model} and set no model env, so
+     * each CLI runs with whatever default it is itself configured with. A
+     * model the user picks explicitly (picker / custom) is still honoured
+     * exactly as before.
+     */
     public static String defaultModelForAgent(String agentId) {
-        if (agentId == null) return "default";
-        switch (agentId) {
-            case "claude_code":
-                return "claude-3-7-sonnet";
-            case "antigravity":
-                return "gemini-2.5-pro";
-            case "codex":
-                return "o3-mini";
-            case "opencode":
-                return "deepseek-r1";
-            case "kiro":
-                return "claude-3-7-sonnet";
-            case "kilo":
-                return "claude-3-7-sonnet";
-            case "grok":
-                return "grok-3";
-            case "github_copilot":
-                return "gpt-4o";
-            default:
-                return "default";
-        }
+        return "default";
     }
 
     public static boolean isAlienModelForAgent(String agentId, String model) {
@@ -785,33 +837,79 @@ public class CLIAgentManager {
         }
     }
 
+    /**
+     * Agents whose CLI enumerates models as full {@code provider/model} ids,
+     * one per line ({@code opencode models}; Kilo is an OpenCode-family CLI
+     * with the same listing format). For those agents the provider prefix is
+     * PART of the model id: the CLI expects it back verbatim in
+     * {@code --model provider/model}.
+     */
+    static boolean isProviderModelAgent(String agentId) {
+        return "opencode".equals(agentId) || "kilo".equals(agentId);
+    }
+
+    /** First path segments that mark a slash token as a filesystem path
+     * fragment (e.g. from --help text), never a provider name. */
+    private static final Set<String> PATH_FIRST_SEGMENTS = new HashSet<>(Arrays.asList(
+            "usr", "bin", "sbin", "etc", "var", "tmp", "home", "data", "storage",
+            "mnt", "proc", "sys", "dev", "lib", "share", "local", "config",
+            "root", "opt", "run", "android", "sdcard"));
+
+    /**
+     * Is this token a full {@code provider/model} id (e.g.
+     * {@code opencode/big-pickle}, {@code anthropic/claude-sonnet-4-5})?
+     * Deliberately stricter than "contains a slash": the provider must look
+     * like a provider name (not a path segment) and the model part must
+     * carry a '-' / '.' / digit — real model ids virtually always do, while
+     * help-text path fragments like {@code config/opencode} do not.
+     */
+    public static boolean looksLikeProviderModelId(String token) {
+        if (token == null || token.length() > 100) return false;
+        int slash = token.indexOf('/');
+        if (slash <= 0 || slash == token.length() - 1) return false;
+        String provider = token.substring(0, slash).toLowerCase();
+        String model = token.substring(slash + 1);
+        if (PATH_FIRST_SEGMENTS.contains(provider)) return false;
+        if (!provider.matches("[a-z0-9][a-z0-9._-]*")) return false;
+        String lowerModel = model.toLowerCase();
+        if (lowerModel.endsWith(".tar") || lowerModel.endsWith(".gz")
+                || lowerModel.endsWith(".bin") || lowerModel.endsWith(".sh")
+                || lowerModel.endsWith(".js") || lowerModel.endsWith(".json")) {
+            return false;
+        }
+        if (!model.matches("[a-zA-Z0-9][a-zA-Z0-9._:+/-]*")) return false;
+        return lowerModel.contains("-") || lowerModel.contains(".")
+                || lowerModel.matches(".*\\d.*");
+    }
+
     public static List<String> parseModelsFromCliOutput(String agentId, String output) {
         List<String> found = new ArrayList<>();
         if (output == null || output.trim().isEmpty()) return found;
         Set<String> seen = new LinkedHashSet<>();
+        boolean providerModelAgent = isProviderModelAgent(agentId);
 
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\b([a-zA-Z0-9]+(?:[-./][a-zA-Z0-9]+)+)\\b");
-        java.util.regex.Matcher matcher = pattern.matcher(output);
-        while (matcher.find()) {
-            String token = matcher.group(1).trim();
-            if (token.contains("/")) {
-                String sub = token.substring(token.lastIndexOf('/') + 1);
-                if (looksLikeModelName(agentId, sub)) {
-                    token = sub;
-                }
-            }
-            if (looksLikeModelName(agentId, token) && !seen.contains(token)) {
-                seen.add(token);
-                found.add(token);
-            }
-        }
-
+        // Line pass FIRST: CLIs that print one model per line (notably
+        // `opencode models`, which prints full provider/model ids) keep
+        // their exact order and their exact ids here. The old code ran the
+        // regex pass first and, for slash tokens, kept only the part after
+        // the last '/' if it started with deepseek/claude/gpt/gemini/o1/o3 —
+        // so from OpenCode's full list only "deepseek-v4.1-flash-free"
+        // survived and every other model (big-pickle, hy4-flash, glm-…,
+        // mimo-…, nemotron-…) was silently dropped, and even the survivor
+        // lost its "opencode/" prefix.
         String[] lines = output.split("\\r?\\n");
         for (String line : lines) {
             String trimmed = line.trim();
             trimmed = trimmed.replaceFirst("^[-*•\\d.]+\\s*", "").trim();
             int spaceIdx = trimmed.indexOf(' ');
             String candidate = (spaceIdx > 0) ? trimmed.substring(0, spaceIdx) : trimmed;
+            if (providerModelAgent && looksLikeProviderModelId(candidate)) {
+                if (!seen.contains(candidate)) {
+                    seen.add(candidate);
+                    found.add(candidate);
+                }
+                continue;
+            }
             if (candidate.contains("/")) {
                 String sub = candidate.substring(candidate.lastIndexOf('/') + 1);
                 if (looksLikeModelName(agentId, sub)) candidate = sub;
@@ -829,6 +927,33 @@ public class CLIAgentManager {
             if (dashed != null && looksLikeModelName(agentId, dashed) && !seen.contains(dashed)) {
                 seen.add(dashed);
                 found.add(dashed);
+            }
+        }
+
+        // Regex pass: catches ids embedded in prose / --help text that the
+        // line pass missed. For provider/model agents a full slash token
+        // that looks like a provider/model id is kept WHOLE (never stripped
+        // to a duplicate of the part after the slash).
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\b([a-zA-Z0-9]+(?:[-./][a-zA-Z0-9]+)+)\\b");
+        java.util.regex.Matcher matcher = pattern.matcher(output);
+        while (matcher.find()) {
+            String token = matcher.group(1).trim();
+            if (token.contains("/")) {
+                if (providerModelAgent && looksLikeProviderModelId(token)) {
+                    if (!seen.contains(token)) {
+                        seen.add(token);
+                        found.add(token);
+                    }
+                    continue;
+                }
+                String sub = token.substring(token.lastIndexOf('/') + 1);
+                if (looksLikeModelName(agentId, sub)) {
+                    token = sub;
+                }
+            }
+            if (looksLikeModelName(agentId, token) && !seen.contains(token)) {
+                seen.add(token);
+                found.add(token);
             }
         }
         return found;
@@ -918,6 +1043,26 @@ public class CLIAgentManager {
                         (rawOutput == null ? "" : rawOutput) + "\n" + nativeRaw);
             }
         }
+        if (agent.id.equals("opencode")) {
+            // `opencode models` only lists CONNECTED providers (on X's phone:
+            // just the built-in opencode/ provider, 13 models), while the
+            // TUI's "View all providers" list is the full models.dev
+            // catalogue. Merge: connected ids first (live, in CLI order),
+            // then every other provider/model the catalogue offers.
+            List<String> merged = OpenCodeLink.fetchFullCatalogueSync(parsed);
+            // Alongside the ids, cache each model's server variant names —
+            // the thinking dialog/send path resolves levels against these
+            // and must never guess a variant the model doesn't define.
+            Map<String, List<String>> variants = OpenCodeLink.fetchVariantMapSync();
+            if (!variants.isEmpty()) {
+                saveModelVariants(variants);
+            }
+            if (merged.size() > parsed.size()) {
+                saveLiveModelsCache(agent.id, merged);
+                return merged;
+            }
+        }
+
         if (!parsed.isEmpty()) {
             saveLiveModelsCache(agent.id, parsed);
             return parsed;
@@ -935,6 +1080,64 @@ public class CLIAgentManager {
                 new Handler(Looper.getMainLooper()).post(() -> callback.onModelsLoaded(models));
             }
         }).start();
+    }
+
+    // ------------------------------------------------------------------
+    // Per-model thinking variants (OpenCode linked mode)
+    // ------------------------------------------------------------------
+
+    /** Cache of modelId → comma-joined variant names ("" = known none). */
+    public static final String KEY_MODEL_VARIANTS_PREFIX = "model_variants_v1_";
+
+    /** Persist the variant map fetched alongside the OpenCode catalogue. */
+    public void saveModelVariants(Map<String, List<String>> variantsByModel) {
+        if (variantsByModel == null || variantsByModel.isEmpty()) return;
+        SharedPreferences.Editor ed = prefs.edit();
+        for (Map.Entry<String, List<String>> e : variantsByModel.entrySet()) {
+            StringBuilder sb = new StringBuilder();
+            List<String> names = e.getValue();
+            if (names != null) {
+                for (int i = 0; i < names.size(); i++) {
+                    if (i > 0) sb.append(',');
+                    sb.append(names.get(i));
+                }
+            }
+            ed.putString(KEY_MODEL_VARIANTS_PREFIX + e.getKey(), sb.toString());
+        }
+        ed.apply();
+    }
+
+    /**
+     * The variant names {@code modelId} (full {@code provider/model}) is
+     * known to define, or null when nothing has been fetched for it yet.
+     * An empty list means "fetched, and the model defines none" — for
+     * big-pickle that is the real answer (models.dev gives it
+     * {@code reasoning_options: []}, so the server builds it no effort
+     * variants), and callers must not invent one.
+     */
+    public List<String> getModelVariants(String modelId) {
+        if (modelId == null) return null;
+        String saved = prefs.getString(KEY_MODEL_VARIANTS_PREFIX + modelId, null);
+        if (saved == null) return null;
+        List<String> out = new ArrayList<>();
+        if (!saved.isEmpty()) {
+            for (String n : saved.split(",")) {
+                String t = n.trim();
+                if (!t.isEmpty() && !out.contains(t)) out.add(t);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Resolve the stored thinking level for {@code agentId} + {@code modelId}
+     * to the server variant name to send, or null when nothing may be sent
+     * (Off, unknown variants, or the model doesn't define the mapped name).
+     * Only OpenCode has variants; every other agent resolves to null here.
+     */
+    public String resolveThinkingVariant(String agentId, String modelId, String level) {
+        if (!"opencode".equals(agentId)) return null;
+        return OpenCodeLink.resolveVariant(level, getModelVariants(modelId));
     }
 
     public void saveLiveModelsCache(String agentId, List<String> models) {
@@ -959,6 +1162,357 @@ public class CLIAgentManager {
             }
         }
         return list;
+    }
+
+    // ------------------------------------------------------------------
+    // Real default model fetch
+    // ------------------------------------------------------------------
+
+    public static final String KEY_AGENT_REAL_MODEL_PREFIX = "agent_real_model_";
+
+    public interface RealModelCallback {
+        void onRealModelLoaded(String model);
+    }
+
+    /**
+     * The model the CLI will actually use when the app passes no
+     * {@code --model} — fetched from the CLI's OWN artefacts, never invented:
+     *
+     * <ul>
+     *   <li><b>OpenCode</b> resolves its default exactly the way the CLI does:
+     *       the {@code model} field of {@code ~/.config/opencode/opencode.json(c)}
+     *       first, then the last-used model the TUI recorded in
+     *       {@code ~/.local/state/opencode/model.json} ({@code recent[0]}),
+     *       then — only when no provider is connected (no keys in
+     *       {@code ~/.local/share/opencode/auth.json}) — OpenCode's built-in
+     *       free default {@code opencode/big-pickle}, which is what its TUI
+     *       shows out of the box ("Build · Big Pickle"). When a provider IS
+     *       connected but neither file names a model, the default is that
+     *       provider's own first model, which no file records — null.</li>
+     *   <li><b>Claude Code</b>: the app's own AI-Keys model when set (it is
+     *       exported as {@code ANTHROPIC_MODEL}, which beats config), else the
+     *       {@code model} field of {@code ~/.claude/settings.json}. When
+     *       neither exists the default depends on the user's Anthropic plan,
+     *       which no local file records — null.</li>
+     *   <li><b>Codex</b>: the top-level {@code model = "..."} of
+     *       {@code ~/.codex/config.toml}. Unset → plan-dependent — null.</li>
+     *   <li>Antigravity, Kiro, Kilo, Grok, Copilot and Custom expose no local
+     *       artefact that records a current/default model (their
+     *       {@code models} listings do not mark one), so they honestly return
+     *       null and the UI keeps the plain "Default (CLI's own default)"
+     *       label for them.</li>
+     * </ul>
+     *
+     * <p>Homes are searched in run-environment order: the workshop rootfs
+     * home ({@code <rootfs>/root}, where the terminal's proot login lands)
+     * first, then the native Termux home. Pure file reads — no process is
+     * spawned — but callers should still use
+     * {@link #refreshRealModelAsync} off the UI thread.</p>
+     */
+    public String fetchRealDefaultModel(String agentId) {
+        if (agentId == null) return null;
+        switch (agentId) {
+            case "claude_code": {
+                String appModel = getAnthropicModel();
+                if (appModel != null && !appModel.trim().isEmpty()) return appModel.trim();
+                for (File home : agentHomeDirs()) {
+                    String model = parseJsonStringField(
+                            readSmallTextFile(new File(home, ".claude/settings.json")), "model");
+                    if (model != null) return model;
+                }
+                return null;
+            }
+            case "opencode": {
+                String configModel = null;
+                String recentModel = null;
+                boolean hasAuth = false;
+                for (File home : agentHomeDirs()) {
+                    if (configModel == null) {
+                        for (String name : new String[]{"opencode.jsonc", "opencode.json", "config.json"}) {
+                            configModel = parseJsonStringField(readSmallTextFile(
+                                    new File(home, ".config/opencode/" + name)), "model");
+                            if (configModel != null) break;
+                        }
+                    }
+                    if (recentModel == null) {
+                        recentModel = parseOpencodeRecentModel(readSmallTextFile(
+                                new File(home, ".local/state/opencode/model.json")));
+                    }
+                    if (!hasAuth) {
+                        String auth = readSmallTextFile(
+                                new File(home, ".local/share/opencode/auth.json"));
+                        hasAuth = auth != null && auth.contains("\"key\"");
+                    }
+                    if (configModel != null && recentModel != null && hasAuth) break;
+                }
+                return resolveOpencodeDefaultModel(configModel, recentModel, hasAuth);
+            }
+            case "codex": {
+                for (File home : agentHomeDirs()) {
+                    String model = parseCodexTomlModel(
+                            readSmallTextFile(new File(home, ".codex/config.toml")));
+                    if (model != null) return model;
+                }
+                return null;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /** OpenCode's own default-resolution order, as a pure function for tests. */
+    static String resolveOpencodeDefaultModel(String configModel, String recentModel,
+                                              boolean hasConnectedProvider) {
+        if (configModel != null && !configModel.isEmpty()) return configModel;
+        if (recentModel != null && !recentModel.isEmpty()) return recentModel;
+        // Keyless out-of-the-box default observed in the CLI's own TUI.
+        if (!hasConnectedProvider) return "opencode/big-pickle";
+        return null;
+    }
+
+    /** First {@code "field": "value"} string in a JSON/JSONC text, or null. */
+    static String parseJsonStringField(String content, String field) {
+        if (content == null || field == null) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "\"" + java.util.regex.Pattern.quote(field) + "\"\\s*:\\s*\"([^\"]+)\"")
+                .matcher(content);
+        return m.find() ? m.group(1) : null;
+    }
+
+    /**
+     * The first entry of the {@code recent[]} array in OpenCode's
+     * {@code ~/.local/state/opencode/model.json}, as {@code provider/model}.
+     * Entries are {@code {"providerID": "...", "modelID": "..."}} objects;
+     * {@code recent[0]} is the model the TUI last used and will start with.
+     */
+    static String parseOpencodeRecentModel(String content) {
+        if (content == null) return null;
+        int idx = content.indexOf("\"recent\"");
+        if (idx < 0) return null;
+        String scope = content.substring(idx);
+        String provider = parseJsonStringField(scope, "providerID");
+        String model = parseJsonStringField(scope, "modelID");
+        if (model == null || model.isEmpty()) return null;
+        return (provider != null && !provider.isEmpty()) ? provider + "/" + model : model;
+    }
+
+    /** The top-level {@code model = "..."} of a Codex config.toml, or null. */
+    static String parseCodexTomlModel(String content) {
+        if (content == null) return null;
+        java.util.regex.Pattern pattern =
+                java.util.regex.Pattern.compile("^model\\s*=\\s*\"([^\"]+)\"");
+        for (String raw : content.split("\n")) {
+            String line = raw.trim();
+            if (line.startsWith("[")) break; // first section: top-level keys are above it
+            java.util.regex.Matcher m = pattern.matcher(line);
+            if (m.find()) return m.group(1);
+        }
+        return null;
+    }
+
+    /** Homes an agent CLI may keep its config in, run environment first. */
+    private List<File> agentHomeDirs() {
+        List<File> homes = new ArrayList<>();
+        if (isWorkshopAvailable()) {
+            for (String distro : WORKSHOP_DISTRO_CHOICES) {
+                for (String rootfs : new String[]{containerRootfsPath(distro), legacyRootfsPath(distro)}) {
+                    File root = new File(rootfs);
+                    if (root.isDirectory()) homes.add(new File(root, "root"));
+                }
+            }
+        }
+        homes.add(new File(TermuxConstants.TERMUX_HOME_DIR_PATH));
+        return homes;
+    }
+
+    /** Read a small text file fully (config/cmdline sized), or null. */
+    static String readSmallTextFile(File file) {
+        if (file == null || !file.isFile()) return null;
+        try {
+            java.io.FileInputStream in = new java.io.FileInputStream(file);
+            try {
+                byte[] buf = new byte[256 * 1024];
+                int n = in.read(buf);
+                if (n <= 0) return null;
+                return new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8);
+            } finally {
+                in.close();
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** The last fetched real default model for an agent, or null if unknown. */
+    public String getCachedRealModel(String agentId) {
+        if (agentId == null) return null;
+        String value = prefs.getString(KEY_AGENT_REAL_MODEL_PREFIX + agentId, null);
+        return (value == null || value.trim().isEmpty()) ? null : value;
+    }
+
+    /** Picker label for the Default row: names the real model once fetched. */
+    public String getDefaultModelLabel(String agentId) {
+        String real = getCachedRealModel(agentId);
+        return real != null ? "Default (" + real + ")" : "Default (CLI's own default)";
+    }
+
+    /**
+     * Fetch the agent's real default model on a background thread (same
+     * pattern as {@link #queryLiveModelsAsync}), cache it for the chip and
+     * picker, and deliver it on the main thread. A null result clears any
+     * stale cache so the UI falls back to the honest plain label.
+     */
+    public void refreshRealModelAsync(CLIAgent agent, RealModelCallback callback) {
+        if (agent == null) {
+            if (callback != null) callback.onRealModelLoaded(null);
+            return;
+        }
+        new Thread(() -> {
+            String model = fetchRealDefaultModel(agent.id);
+            if (model != null) {
+                prefs.edit().putString(KEY_AGENT_REAL_MODEL_PREFIX + agent.id, model).apply();
+            } else {
+                prefs.edit().remove(KEY_AGENT_REAL_MODEL_PREFIX + agent.id).apply();
+            }
+            if (callback != null) {
+                new Handler(Looper.getMainLooper()).post(() -> callback.onRealModelLoaded(model));
+            }
+        }).start();
+    }
+
+    // ------------------------------------------------------------------
+    // Running-agent check for terminal sessions
+    // ------------------------------------------------------------------
+
+    /** npm package paths that betray a node-hosted agent in a process cmdline. */
+    static final String[][] AGENT_CMDLINE_MARKERS = {
+            {"claude_code", "@anthropic-ai/claude-code"},
+            {"codex", "@openai/codex"},
+            {"kilo", "@kilocode/cli"},
+            {"github_copilot", "@github/copilot"},
+    };
+
+    /**
+     * Which agent (if any) a process cmdline belongs to. Only argv[0]'s
+     * basename is matched against agent binary names — matching every token
+     * would false-positive on things like {@code grep opencode file} — plus
+     * npm package markers anywhere in the cmdline for node-hosted CLIs whose
+     * argv[0] is just {@code node} / {@code npx}.
+     */
+    static String matchAgentInCmdline(String cmdline) {
+        if (cmdline == null || cmdline.isEmpty()) return null;
+        String[] argv = cmdline.split("\u0000");
+        if (argv.length == 0) return null;
+        String argv0 = argv[0].trim();
+        String base = argv0.substring(argv0.lastIndexOf('/') + 1);
+        for (CLIAgent agent : AGENTS) {
+            if (agent.binaryName != null && !agent.binaryName.isEmpty()
+                    && base.equals(agent.binaryName)) {
+                return agent.id;
+            }
+        }
+        for (String[] marker : AGENT_CMDLINE_MARKERS) {
+            if (cmdline.contains(marker[1])) return marker[0];
+        }
+        return null;
+    }
+
+    /** All descendants of {@code rootPid} in a parent→children map (BFS, cycle-safe). */
+    static java.util.Set<Integer> collectDescendantPids(
+            int rootPid, java.util.Map<Integer, java.util.List<Integer>> childrenByParent) {
+        java.util.Set<Integer> out = new java.util.LinkedHashSet<>();
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        queue.add(rootPid);
+        while (!queue.isEmpty()) {
+            int cur = queue.poll();
+            java.util.List<Integer> kids = childrenByParent.get(cur);
+            if (kids == null) continue;
+            for (int kid : kids) {
+                if (out.add(kid)) queue.add(kid);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The agent currently running inside the terminal session whose shell
+     * has pid {@code sessionPid}, or null when none is. This reads LIVE
+     * /proc state (the session shell's process tree: host bash → proot →
+     * rootfs bash → agent), so it cannot go stale the way a persisted flag
+     * would — when the agent exits, its process is gone and this returns
+     * null again, and a reopened terminal starts it normally.
+     */
+    public static String findRunningAgentIdForSessionPid(int sessionPid) {
+        if (sessionPid <= 0) return null;
+        try {
+            java.util.Map<Integer, java.util.List<Integer>> children = readProcChildrenMap(sessionPid);
+            for (int pid : collectDescendantPids(sessionPid, children)) {
+                String agentId = matchAgentInCmdline(
+                        readSmallTextFile(new File("/proc/" + pid + "/cmdline")));
+                if (agentId != null) return agentId;
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    /**
+     * Parent→children map for the tree under {@code rootPid}. Fast path:
+     * {@code /proc/<pid>/task/<pid>/children} walked recursively (only the
+     * session's own tree is touched). Fallback when no children file is
+     * readable (old kernels): a full /proc ppid scan.
+     */
+    private static java.util.Map<Integer, java.util.List<Integer>> readProcChildrenMap(int rootPid) {
+        java.util.Map<Integer, java.util.List<Integer>> map = new java.util.HashMap<>();
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        queue.add(rootPid);
+        boolean anyChildrenFile = false;
+        while (!queue.isEmpty()) {
+            int cur = queue.poll();
+            String content = readSmallTextFile(new File("/proc/" + cur + "/task/" + cur + "/children"));
+            if (content == null) continue;
+            anyChildrenFile = true;
+            java.util.List<Integer> kids = new java.util.ArrayList<>();
+            for (String token : content.trim().split("\\s+")) {
+                if (token.isEmpty()) continue;
+                try {
+                    int kid = Integer.parseInt(token);
+                    kids.add(kid);
+                    queue.add(kid);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            if (!kids.isEmpty()) map.put(cur, kids);
+        }
+        if (anyChildrenFile) return map;
+
+        File[] procEntries = new File("/proc").listFiles();
+        if (procEntries == null) return map;
+        for (File entry : procEntries) {
+            int pid;
+            try {
+                pid = Integer.parseInt(entry.getName());
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            String stat = readSmallTextFile(new File(entry, "stat"));
+            if (stat == null) continue;
+            int close = stat.lastIndexOf(')');
+            if (close < 0) continue;
+            String[] fields = stat.substring(close + 1).trim().split("\\s+");
+            if (fields.length < 2) continue;
+            try {
+                int ppid = Integer.parseInt(fields[1]);
+                java.util.List<Integer> kids = map.get(ppid);
+                if (kids == null) {
+                    kids = new java.util.ArrayList<>();
+                    map.put(ppid, kids);
+                }
+                kids.add(pid);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return map;
     }
 
     public String getAgentModel(String agentId) {
@@ -1014,12 +1568,18 @@ public class CLIAgentManager {
                 + "done\n"
                 + "echo \"Open this URL on your phone browser: $url\"\n"
                 + "exit 0\n";
+        // TERMUX_PKG_NO_MIRROR_SELECT (exported below): keep pkg on the bootstrap
+        // default Cloudflare mirror instead of its test-everything weighted
+        // lottery, which picked a slow, stale Chinese mirror on a real device.
+        // Related: proot-distro installs must name ncurses + ncurses-utils in the
+        // same transaction or an old ncurses-utils pin breaks apt (see wizard).
         return "mkdir -p ~/.local/bin"
             + " && { [ -f ~/.local/bin/xdg-open ] || { printf '%b' '" + shimBody.replace("'", "'\\''").replace("\n", "\\n") + "' > ~/.local/bin/xdg-open && chmod +x ~/.local/bin/xdg-open; }; }"
             + " && export PATH=\"$HOME/.local/bin:$HOME/.opencode/bin:$HOME/.grok/bin:"
             + termuxHomeBin + "/.local/bin:" + termuxHomeBin + "/.opencode/bin:"
             + termuxHomeBin + "/.grok/bin:/root/.local/bin:/root/.opencode/bin:/root/.grok/bin:$PATH\""
             + " && hash -r 2>/dev/null || true"
+            + " && export TERMUX_PKG_NO_MIRROR_SELECT=1"
             + " && export BROWSER=xdg-open 2>/dev/null || true"
             + " && { [ -f \"" + cert + "\" ] && export SSL_CERT_FILE=\"" + cert + "\" && export NODE_EXTRA_CA_CERTS=\"" + cert + "\" || true; }"
             + " && ";
@@ -1056,6 +1616,20 @@ public class CLIAgentManager {
                 .replace("{workspace}", workspace);
 
         cmd = shellPrelude() + cmd;
+
+        // Linked mode: when the shared OpenCode server (started by the GUI
+        // chat, see OpenCodeLink) is alive, the terminal must attach to THAT
+        // server instead of starting a separate TUI instance — one live
+        // session, shared by GUI and CLI, same conversation on both sides.
+        // The attach must also name the GUI's session (--session <id>,
+        // read fresh here at terminal-open time): a bare attach lands the
+        // TUI in a NEW empty session, which a phone test caught — the GUI
+        // conversation was nowhere to be seen in the CLI.
+        if (agent.id.equals("opencode") && OpenCodeLink.isServerUp()) {
+            cmd = shellPrelude()
+                + "export PATH=\"$HOME/.opencode/bin:$PATH\" && "
+                + OpenCodeLink.buildAttachCommand(OpenCodeLink.getSessionId());
+        }
 
         // Prepend Anthropic vars if Claude Code is selected
         if (agent.id.equals("claude_code")) {
@@ -1105,21 +1679,47 @@ public class CLIAgentManager {
             if (selectedModel != null && !selectedModel.isEmpty() && !selectedModel.equals("default")) {
                 cmd = cmd + " --model " + escapeForDoubleQuotes(selectedModel);
             }
+            // Every level maps to the --thinking word the chip names (agy's
+            // own model listings use the same low/medium/high words — see
+            // dashedDisplayNameCandidate). Low/Medium used to append nothing,
+            // so the chip promised a budget the CLI never received.
             if (thinkingTokens == 0) {
                 cmd = cmd + " --thinking off";
-            } else if (thinkingTokens >= 16384) {
+            } else if (thinkingTokens <= 2048) {
+                cmd = cmd + " --thinking low";
+            } else if (thinkingTokens <= 8192) {
+                cmd = cmd + " --thinking medium";
+            } else {
                 cmd = cmd + " --thinking high";
             }
         } else if (agent.id.equals("codex")) {
             if (selectedModel != null && !selectedModel.isEmpty() && !selectedModel.equals("default")) {
                 cmd = cmd + " --model " + escapeForDoubleQuotes(selectedModel);
             }
-            String effort = thinkingTokens == 0 ? "low" : (thinkingTokens <= 8192 ? "medium" : "high");
-            cmd = cmd + " --reasoning-effort " + effort;
+            // "Off" must mean off: no effort flag at all (the CLI then uses
+            // its own default). It used to append --reasoning-effort low, and
+            // Low (2k) used to map to "medium" — label and applied disagreed.
+            if (thinkingTokens > 0) {
+                String effort = thinkingTokens <= 2048 ? "low" : (thinkingTokens <= 8192 ? "medium" : "high");
+                cmd = cmd + " --reasoning-effort " + effort;
+            }
         } else if (agent.id.equals("opencode") || agent.id.equals("grok")
                 || agent.id.equals("kiro") || agent.id.equals("kilo") || agent.id.equals("github_copilot")) {
             if (selectedModel != null && !selectedModel.isEmpty() && !selectedModel.equals("default")) {
                 cmd = cmd + " --model " + escapeForDoubleQuotes(selectedModel);
+            }
+            if (agent.id.equals("opencode")) {
+                // One-shot fallback for the linked thinking level: `opencode
+                // run` accepts --variant with the same per-model names the
+                // server takes. Append it ONLY when the level resolves
+                // against the model's fetched variant list — an unknown
+                // variant name is a model-resolution error in the CLI.
+                String variantModel = (selectedModel != null && !selectedModel.equals("default"))
+                        ? selectedModel : getCachedRealModel(agent.id);
+                String variant = resolveThinkingVariant(agent.id, variantModel, selectedThinking);
+                if (variant != null) {
+                    cmd = cmd + " --variant " + variant;
+                }
             }
         }
 
@@ -1366,9 +1966,12 @@ public class CLIAgentManager {
      * anyway, in the same environment the terminal uses.
      */
     public String buildSetupAllCommand(java.util.List<CLIAgent> missingAgents) {
+        // The command below pkg-installs proot-distro on the host; repo .debs
+        // need the translation layer first (see RepoCompatInstaller).
+        RepoCompatInstaller.ensureInstalled();
         StringBuilder sb = new StringBuilder();
         sb.append(shellPrelude());
-        sb.append("if ! command -v proot-distro &> /dev/null; then pkg update -y && pkg install -y proot-distro; fi; ");
+        sb.append("if ! command -v proot-distro &> /dev/null; then pkg update -y && pkg install -y ncurses ncurses-utils proot-distro; fi; ");
         sb.append("if [ ! -d \"$PREFIX/var/lib/proot-distro/installed-rootfs/ubuntu\" ]; then proot-distro install ubuntu; fi; ");
         for (CLIAgent agent : missingAgents) {
             if (agent.installCommand != null && !agent.installCommand.isEmpty()) {

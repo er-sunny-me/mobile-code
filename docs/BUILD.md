@@ -21,11 +21,15 @@ Notes:
   at setup time and install via the wizard in ~1 minute.
 - `proot-distro` package + `apt` packages (curl, nodejs) still need network once
   at first setup; everything big is offline.
-- Opt-out flags: `-PbundleWorkshop=0` (no rootfs), `-PbundleAgents=0` (no agents),
-  `-PbundleBigAgents=0` (skip grok+kiro). Failures warn loudly but never break
-  the build — the setup wizard falls back to network install.
-- Test APK is ~600MB (universal). For daily dev builds use
-  `-PbundleWorkshop=0 -PbundleAgents=0` to keep it small.
+- Defaults (2026-11-25): ONLY the Ubuntu rootfs is bundled
+  (`bundleWorkshop=1`); agent binaries are NOT bundled by default
+  (`bundleAgents=0`, `bundleBigAgents=0`) and install from the network at
+  first setup. Opt-out/opt-in flags: `-PbundleWorkshop=0` (no rootfs),
+  `-PbundleAgents=1` (bundle agy+opencode), `-PbundleBigAgents=1` (also
+  grok+kiro). Failures warn loudly but never break the build — the setup
+  wizard falls back to network install.
+- Default universal debug APK is ~200MB. For lean daily dev builds use
+  `-PbundleWorkshop=0` to keep it small (~141MB).
 
 ## First-Run Setup Wizard
 First app open shows `SetupWizardActivity` (re-runnable from
@@ -33,7 +37,7 @@ Settings → Run Setup Wizard) with live progress:
 1. **Storage access** — All-files permission for workspaces.
 2. **Termux base system** — bootstrap (already in APK).
 3. **Linux system** — Ubuntu (bundled, offline), Debian or Alpine (download).
-4. **Coding agents** — bundled binaries first, network installers as fallback.
+4. **Coding agents** — network installers (bundled binaries first only in opt-in bundleAgents builds).
 
 ## Local Command Line Build
 To build an unsigned debug APK:
