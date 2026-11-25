@@ -53,8 +53,8 @@ android {
         targetSdkVersion project.properties.targetSdkVersion.toInteger()
         multiDexEnabled true
         applicationId "com.xyzide"
-        versionCode 131
-        versionName "0.1.0"
+        versionCode 132
+        versionName "0.1.1"
 
         if (appVersionName) versionName = appVersionName
         validateVersionName(versionName)
