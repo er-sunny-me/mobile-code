@@ -126,7 +126,7 @@ public class AgentListAdapter extends RecyclerView.Adapter<AgentListAdapter.Hold
         holder.toggleButton.setText(enabled ? "Disable" : "Enable");
         holder.toggleButton.setOnClickListener(v -> listener.onToggleEnabled(agent));
 
-        holder.defaultButton.setText(isDefault ? "In use" : "Use in Chat");
+        holder.defaultButton.setText(isDefault ? "Default" : "Set Default");
         holder.defaultButton.setEnabled(!isDefault);
         holder.defaultButton.setAlpha(isDefault ? 0.5f : 1f);
         if (isDefault) {

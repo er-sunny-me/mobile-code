@@ -69,46 +69,100 @@ public class FileExplorerAdapter extends RecyclerView.Adapter<FileExplorerAdapte
     public void onBindViewHolder(@NonNull FileViewHolder holder, int position) {
         File file = files.get(position);
         holder.tvFileName.setText(file.getName());
-        
+        bindFileIcon(holder.ivIcon, file);
+        holder.itemView.setOnClickListener(v -> listener.onFileClick(file));
+    }
+
+    /**
+     * Resolves a VS Code-style file or folder icon and optional tint for an explorer row.
+     */
+    public static void bindFileIcon(@NonNull ImageView iconView, @NonNull File file) {
+        String name = file.getName();
+        if ("..".equals(name)) {
+            iconView.setImageResource(R.drawable.ic_folder);
+            iconView.setColorFilter(0xFF9CA3AF);
+            return;
+        }
         if (file.isDirectory()) {
-            holder.ivIcon.setImageResource(android.R.drawable.ic_menu_sort_by_size); // Folder icon substitute
-            holder.ivIcon.setColorFilter(0xFFFACC15); // Yellow tint
-        } else {
-            String fileName = file.getName().toLowerCase();
-            if (fileName.endsWith(".py")) {
-                holder.ivIcon.setImageResource(R.drawable.ic_python);
-                holder.ivIcon.setColorFilter(null);
-            } else if (fileName.endsWith(".js")) {
-                holder.ivIcon.setImageResource(R.drawable.ic_javascript);
-                holder.ivIcon.setColorFilter(null);
-            } else if (fileName.endsWith(".ts")) {
-                holder.ivIcon.setImageResource(R.drawable.ic_typescript);
-                holder.ivIcon.setColorFilter(null);
-            } else if (fileName.endsWith(".java")) {
-                holder.ivIcon.setImageResource(R.drawable.ic_java);
-                holder.ivIcon.setColorFilter(null);
-            } else if (fileName.endsWith(".cpp") || fileName.endsWith(".c") || fileName.endsWith(".h") || fileName.endsWith(".hpp")) {
-                holder.ivIcon.setImageResource(R.drawable.ic_cpp);
-                holder.ivIcon.setColorFilter(null);
-            } else if (fileName.endsWith(".html") || fileName.endsWith(".htm")) {
-                holder.ivIcon.setImageResource(R.drawable.ic_html);
-                holder.ivIcon.setColorFilter(null);
-            } else if (fileName.endsWith(".css")) {
-                holder.ivIcon.setImageResource(R.drawable.ic_css);
-                holder.ivIcon.setColorFilter(null);
-            } else if (fileName.endsWith(".kt") || fileName.endsWith(".kts")) {
-                holder.ivIcon.setImageResource(R.drawable.ic_kotlin);
-                holder.ivIcon.setColorFilter(null);
-            } else if (fileName.endsWith(".rs")) {
-                holder.ivIcon.setImageResource(R.drawable.ic_rust);
-                holder.ivIcon.setColorFilter(null);
-            } else {
-                holder.ivIcon.setImageResource(android.R.drawable.ic_menu_help); // File icon substitute
-                holder.ivIcon.setColorFilter(0xFF9CA3AF); // Gray tint
-            }
+            iconView.setImageResource(R.drawable.ic_folder);
+            iconView.clearColorFilter();
+            return;
         }
 
-        holder.itemView.setOnClickListener(v -> listener.onFileClick(file));
+        String lower = name.toLowerCase();
+        if ("gradlew".equals(lower) || "gradlew.bat".equals(lower)
+            || lower.endsWith(".gradle") || lower.endsWith(".gradle.kts")) {
+            iconView.setImageResource(R.drawable.ic_gradle);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".md") || lower.endsWith(".mdx") || lower.endsWith(".markdown")) {
+            iconView.setImageResource(R.drawable.ic_markdown);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".py")) {
+            iconView.setImageResource(R.drawable.ic_python);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".js") || lower.endsWith(".mjs")
+            || lower.endsWith(".cjs") || lower.endsWith(".jsx")) {
+            iconView.setImageResource(R.drawable.ic_javascript);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".ts") || lower.endsWith(".tsx")) {
+            iconView.setImageResource(R.drawable.ic_typescript);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".java")) {
+            iconView.setImageResource(R.drawable.ic_java);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".kt") || lower.endsWith(".kts")) {
+            iconView.setImageResource(R.drawable.ic_kotlin);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".cpp") || lower.endsWith(".c")
+            || lower.endsWith(".h") || lower.endsWith(".hpp")) {
+            iconView.setImageResource(R.drawable.ic_cpp);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".html") || lower.endsWith(".htm")) {
+            iconView.setImageResource(R.drawable.ic_html);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".css") || lower.endsWith(".scss") || lower.endsWith(".sass")) {
+            iconView.setImageResource(R.drawable.ic_css);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".rs")) {
+            iconView.setImageResource(R.drawable.ic_rust);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".json") || lower.endsWith(".jsonc")) {
+            iconView.setImageResource(R.drawable.ic_json);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".xml")) {
+            iconView.setImageResource(R.drawable.ic_xml);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".sh") || lower.endsWith(".bash")
+            || lower.endsWith(".zsh") || lower.endsWith(".bat") || lower.endsWith(".cmd")) {
+            iconView.setImageResource(R.drawable.ic_shell);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".db") || lower.endsWith(".sqlite")
+            || lower.endsWith(".sqlite3") || lower.endsWith(".db3")) {
+            iconView.setImageResource(R.drawable.ic_database);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".yml") || lower.endsWith(".yaml")
+            || lower.endsWith(".toml") || lower.endsWith(".properties")
+            || lower.endsWith(".ini") || lower.endsWith(".cfg")
+            || lower.endsWith(".conf") || lower.endsWith(".env")
+            || ".gitignore".equals(lower) || ".gitattributes".equals(lower)) {
+            iconView.setImageResource(R.drawable.ic_config);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".png") || lower.endsWith(".jpg")
+            || lower.endsWith(".jpeg") || lower.endsWith(".webp")
+            || lower.endsWith(".svg") || lower.endsWith(".gif")
+            || lower.endsWith(".ico")) {
+            iconView.setImageResource(R.drawable.ic_file_image);
+            iconView.clearColorFilter();
+        } else if (lower.endsWith(".apk") || lower.endsWith(".aab") || lower.endsWith(".jar")) {
+            iconView.setImageResource(R.drawable.ic_file);
+            iconView.setColorFilter(0xFF3DDC84);
+        } else if (lower.endsWith(".txt") || lower.endsWith(".log")) {
+            iconView.setImageResource(R.drawable.ic_file);
+            iconView.setColorFilter(0xFF9CDCFE);
+        } else {
+            iconView.setImageResource(R.drawable.ic_file);
+            iconView.setColorFilter(0xFF9CA3AF);
+        }
     }
 
     @Override

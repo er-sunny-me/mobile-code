@@ -1,187 +1,252 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- First-run setup wizard: permissions, Termux base, Linux distro, coding agents. -->
+<!-- First-run setup wizard: clean single-scroll VS Code Dark+ mobile flow. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/root_setup"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/zc_chat_bg"
+    android:background="#0D0D10"
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="20dp"
-        android:paddingTop="24dp"
-        android:text="Welcome to Xyz.IDE"
-        android:textColor="@color/zc_text_white"
-        android:textSize="22sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="20dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="8dp"
-        android:text="First launch setup — downloads everything coding agents need: Linux system, tools and agent apps."
-        android:textColor="@color/zc_text_secondary"
-        android:textSize="13sp" />
-
-    <!-- Distro picker -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="20dp"
-        android:paddingTop="4dp"
-        android:text="Linux system"
-        android:textColor="@color/zc_text_muted"
-        android:textSize="11sp"
-        android:textStyle="bold" />
-
+    <!-- Header -->
     <LinearLayout
-        android:id="@+id/distro_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="4dp">
+        android:background="#121216"
+        android:orientation="vertical"
+        android:paddingHorizontal="18dp"
+        android:paddingTop="18dp"
+        android:paddingBottom="14dp">
 
         <TextView
-            android:id="@+id/distro_ubuntu"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_red_button"
-            android:gravity="center"
-            android:text="Ubuntu ★ bundled"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Welcome to Xyz.IDE"
+            android:textColor="#F3F4F6"
+            android:textSize="22sp"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/distro_debian"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_fab_dark"
-            android:gravity="center"
-            android:text="Debian"
-            android:textColor="@color/zc_text_white"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/distro_alpine"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_fab_dark"
-            android:gravity="center"
-            android:text="Alpine"
-            android:textColor="@color/zc_text_white"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="One-tap setup for Linux environment, core CLI tools &amp; AI agents."
+            android:textColor="#9CA3AF"
+            android:textSize="13sp" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/tv_distro_detail"
+    <View
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="20dp"
-        android:paddingBottom="2dp"
-        android:text="Ubuntu 24.04 • 29MB • inside app (offline)"
-        android:textColor="@color/zc_text_secondary"
-        android:textSize="11sp" />
+        android:layout_height="1dp"
+        android:background="#23232A" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_setup_steps"
+    <!-- Scrollable body so distro, steps, agents and log never clip or cramp -->
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp" />
+        android:fillViewport="true">
 
-    <!-- Coding agents picker -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="20dp"
-        android:paddingTop="2dp"
-        android:text="Coding agents — tap to select"
-        android:textColor="@color/zc_text_muted"
-        android:textSize="11sp"
-        android:textStyle="bold" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_setup_agents"
-        android:layout_width="match_parent"
-        android:layout_height="120dp"
-        android:clipToPadding="false"
-        android:paddingTop="2dp"
-        android:paddingBottom="2dp" />
-
-    <!-- Log box -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="2dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Setup log"
-            android:textColor="@color/zc_text_muted"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btn_copy_log"
-            android:layout_width="wrap_content"
-            android:layout_height="30dp"
-            android:background="@drawable/bg_fab_dark"
-            android:gravity="center"
-            android:paddingHorizontal="14dp"
-            android:text="Copy log"
-            android:textColor="@color/zc_text_white"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="90dp"
-        android:background="@color/zc_bg_dark"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="6dp">
-
-        <TextView
-            android:id="@+id/tv_setup_log"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:text="Ready. Tap Start setup.\n"
-            android:textColor="@color/zc_text_muted"
-            android:textSize="10sp" />
-    </ScrollView>
+            android:orientation="vertical"
+            android:paddingBottom="12dp">
 
+            <!-- Distro picker -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="18dp"
+                android:paddingTop="14dp"
+                android:text="LINUX ENVIRONMENT"
+                android:textColor="#8E929B"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/distro_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingHorizontal="14dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="4dp">
+
+                <TextView
+                    android:id="@+id/distro_ubuntu"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1.35"
+                    android:background="@drawable/bg_btn_install_pill"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:minHeight="42dp"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="10dp"
+                    android:text="Ubuntu ★"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/distro_debian"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_settings_row"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:minHeight="42dp"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="10dp"
+                    android:text="Debian"
+                    android:textColor="#E5E7EB"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/distro_alpine"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_settings_row"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:minHeight="42dp"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="10dp"
+                    android:text="Alpine"
+                    android:textColor="#E5E7EB"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_distro_detail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="18dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="8dp"
+                android:text="Ubuntu 24.04 • 29MB • inside app (offline)"
+                android:textColor="#4ADE80"
+                android:textSize="11.5sp" />
+
+            <!-- Setup Steps Checklist -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="18dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="4dp"
+                android:text="SETUP CHECKLIST"
+                android:textColor="#8E929B"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_setup_steps"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false" />
+
+            <!-- Coding agents picker -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="18dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="4dp"
+                android:text="CODING AGENTS (TAP TO SELECT)"
+                android:textColor="#8E929B"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_setup_agents"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false" />
+
+            <!-- Collapsible Setup Log -->
+            <LinearLayout
+                android:id="@+id/setup_log_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="18dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="6dp">
+
+                <TextView
+                    android:id="@+id/tv_setup_log_toggle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Setup log  ▸"
+                    android:textColor="#9CA3AF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_copy_log"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:background="@drawable/bg_settings_row"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="Copy log"
+                    android:textColor="#E5E7EB"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <ScrollView
+                android:id="@+id/scroll_setup_log"
+                android:layout_width="match_parent"
+                android:layout_height="110dp"
+                android:layout_marginHorizontal="14dp"
+                android:background="@drawable/bg_settings_row"
+                android:padding="10dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tv_setup_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="Ready. Tap Start setup.\n"
+                    android:textColor="#9CA3AF"
+                    android:textSize="10.5sp" />
+            </ScrollView>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#23232A" />
+
+    <!-- Bottom sticky bar -->
     <LinearLayout
         android:id="@+id/bottom_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="#121216"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:paddingHorizontal="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="12dp">
 
         <TextView
             android:id="@+id/btn_setup_skip"
@@ -189,10 +254,10 @@
             android:layout_height="46dp"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_fab_dark"
+            android:background="@drawable/bg_settings_row"
             android:gravity="center"
             android:text="Skip"
-            android:textColor="@color/zc_text_white"
+            android:textColor="#E5E7EB"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -201,11 +266,11 @@
             android:layout_width="0dp"
             android:layout_height="46dp"
             android:layout_weight="2"
-            android:background="@drawable/bg_red_button"
+            android:background="@drawable/bg_btn_install_pill"
             android:gravity="center"
             android:text="Start setup"
             android:textColor="#FFFFFF"
-            android:textSize="14sp"
+            android:textSize="14.5sp"
             android:textStyle="bold" />
     </LinearLayout>
 

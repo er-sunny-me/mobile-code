@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0D0D10"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <!-- Top Address & Navigation Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="#1E1E24"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="6dp">
+
+        <ImageButton
+            android:id="@+id/btn_browser_back"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Back"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="#E5E7EB" />
+
+        <ImageButton
+            android:id="@+id/btn_browser_forward"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Forward"
+            android:rotation="180"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="#E5E7EB" />
+
+        <EditText
+            android:id="@+id/et_browser_url"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_marginHorizontal="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_settings_row"
+            android:hint="Search or enter localhost / URL..."
+            android:imeOptions="actionGo"
+            android:inputType="textUri"
+            android:maxLines="1"
+            android:paddingHorizontal="12dp"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:textColor="#F3F4F6"
+            android:textColorHint="#8E929B"
+            android:textSize="13sp" />
+
+        <ImageButton
+            android:id="@+id/btn_browser_reload"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Reload"
+            android:padding="7dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_browser_globe"
+            app:tint="#38BDF8" />
+
+        <TextView
+            android:id="@+id/btn_browser_console"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginHorizontal="2dp"
+            android:background="@drawable/bg_settings_row"
+            android:gravity="center"
+            android:paddingHorizontal="8dp"
+            android:text="&gt;_"
+            android:textColor="#9CA3AF"
+            android:textSize="11.5sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btn_browser_more"
+            android:layout_width="32dp"
+            android:layout_height="34dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="More options"
+            android:src="@drawable/ic_more_vert"
+            app:tint="#E5E7EB" />
+
+        <ImageButton
+            android:id="@+id/btn_browser_close"
+            android:layout_width="32dp"
+            android:layout_height="34dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Close browser"
+            android:padding="7dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_term_close"
+            app:tint="#F48771" />
+    </LinearLayout>
+
+    <!-- Thin VS Code Progress Bar -->
+    <ProgressBar
+        android:id="@+id/pb_browser_load"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:max="100"
+        android:progress="0"
+        android:progressBackgroundTint="#1E1E24"
+        android:progressTint="#007ACC"
+        android:visibility="gone" />
+
+    <!-- Quick Tools Strip: Playwright Status + Localhost Chips -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:background="#141418"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/browser_quick_chips"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="10dp">
+
+            <TextView
+                android:id="@+id/tv_playwright_pill"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_btn_install_pill"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text="🤖 Setup Playwright"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/chip_localhost_3000"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_settings_row"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text=":3000"
+                android:textColor="#D1D5DB"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/chip_localhost_5173"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_settings_row"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text=":5173"
+                android:textColor="#D1D5DB"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/chip_localhost_8080"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_settings_row"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text=":8080"
+                android:textColor="#D1D5DB"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/chip_google"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_settings_row"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text="Google"
+                android:textColor="#D1D5DB"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/chip_github"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:background="@drawable/bg_settings_row"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
+                android:text="GitHub"
+                android:textColor="#D1D5DB"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#26262E" />
+
+    <!-- Embedded WebView -->
+    <WebView
+        android:id="@+id/wv_browser"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Collapsible DevTools Console Drawer -->
+    <LinearLayout
+        android:id="@+id/panel_browser_console"
+        android:layout_width="match_parent"
+        android:layout_height="150dp"
+        android:background="#121216"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="30dp"
+            android:background="#1E1E24"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="WEBVIEW CONSOLE"
+                android:textColor="#9CA3AF"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btn_console_clear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="8dp"
+                android:text="Clear"
+                android:textColor="#38BDF8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <ScrollView
+            android:id="@+id/scroll_browser_console"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/tv_browser_console"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="Console ready.\n"
+                android:textColor="#D1D5DB"
+                android:textSize="10.5sp" />
+        </ScrollView>
+    </LinearLayout>
+
+</LinearLayout>

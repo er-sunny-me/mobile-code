@@ -73,6 +73,42 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
             workspaceObserver.startWatching();
         }
         loadFiles();
+        checkPendingCrashReport();
+    }
+
+    private void checkPendingCrashReport() {
+        android.content.SharedPreferences prefs = getSharedPreferences("ZeroCodePrefs", MODE_PRIVATE);
+        String pkg = prefs.getString(com.termux.app.build.CrashReportReceiver.PREF_PENDING_CRASH_PKG, null);
+        if (pkg == null) return;
+        String err = prefs.getString(com.termux.app.build.CrashReportReceiver.PREF_PENDING_CRASH_ERR, "App crashed");
+        String ws = prefs.getString(com.termux.app.build.CrashReportReceiver.PREF_PENDING_CRASH_WS, null);
+        prefs.edit()
+                .remove(com.termux.app.build.CrashReportReceiver.PREF_PENDING_CRASH_PKG)
+                .remove(com.termux.app.build.CrashReportReceiver.PREF_PENDING_CRASH_ERR)
+                .remove(com.termux.app.build.CrashReportReceiver.PREF_PENDING_CRASH_WS)
+                .apply();
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Debug Crash Captured")
+                .setMessage("Package: " + pkg + "\n" + err + "\n\nFull stacktrace & logcat saved to CRASH_REPORT.md. Send to AI agent?")
+                .setPositiveButton("Fix with AI Agent", (d, w) -> {
+                    Intent fixIntent = new Intent(this, TermuxActivity.class);
+                    fixIntent.setAction(com.termux.app.build.DebugCrashReporterConfig.ACTION_FIX_CRASH);
+                    fixIntent.putExtra("crash_package", pkg);
+                    fixIntent.putExtra("workspace", ws);
+                    startActivity(fixIntent);
+                })
+                .setNeutralButton("Open CRASH_REPORT.md", (d, w) -> {
+                    File base = ws != null ? new File(ws) : workspaceDir;
+                    if (base != null) {
+                        File report = new File(base, com.termux.app.build.DebugCrashReporterConfig.REPORT_FILE_NAME);
+                        if (report.isFile()) {
+                            launchCodeEditor(report);
+                        }
+                    }
+                })
+                .setNegativeButton("Dismiss", null)
+                .show();
     }
 
     @Override
@@ -95,6 +131,7 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
         }
 
         requestManageExternalStorageIfNeeded();
+        requestPostNotificationsIfNeeded();
 
         android.content.SharedPreferences prefs = getSharedPreferences("ZeroCodePrefs", MODE_PRIVATE);
         String savedWorkspace = prefs.getString("workspace_path", null);
@@ -138,6 +175,7 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
                 tvEmptyText.setText("Workspace: " + workspaceDir.getName());
             }
         }
+        updateStatusBarWorkspace();
     }
 
     private void requestManageExternalStorageIfNeeded() {
@@ -158,6 +196,15 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
         }
     }
 
+    private void requestPostNotificationsIfNeeded() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 1002);
+            }
+        }
+    }
+
     private static final int REQUEST_CODE_OPEN_DIRECTORY = 1001;
 
     private void setupActions() {
@@ -170,6 +217,13 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
         if (btnSettings != null) {
             btnSettings.setOnClickListener(v -> ActivityUtils.startActivity(this, new Intent(this, SettingsActivity.class)));
         }
+
+        View.OnClickListener openBrowserListener = v ->
+                startActivity(new Intent(this, com.termux.app.browser.BrowserActivity.class));
+        View btnBrowser = findViewById(R.id.btn_browser);
+        if (btnBrowser != null) btnBrowser.setOnClickListener(openBrowserListener);
+        View btnStatusBrowser = findViewById(R.id.btn_statusbar_browser);
+        if (btnStatusBrowser != null) btnStatusBrowser.setOnClickListener(openBrowserListener);
 
         View btnOpenFolderMain = findViewById(R.id.btn_open_folder_main);
         if (btnOpenFolderMain != null) {
@@ -192,19 +246,142 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
             btnTerminalFab.setOnClickListener(v -> launchTerminal());
         }
 
-        // Agent GUI entry points
-        View btnAgentChat = findViewById(R.id.btn_agent_chat);
-        if (btnAgentChat != null) {
-            btnAgentChat.setOnClickListener(v ->
-                    startActivity(new Intent(this, com.termux.app.gui.AgentChatActivity.class)));
+        View btnWelcomeTerminal = findViewById(R.id.btn_welcome_terminal);
+        if (btnWelcomeTerminal != null) {
+            btnWelcomeTerminal.setOnClickListener(v -> launchTerminal());
         }
 
-        View btnAgentDashboard = findViewById(R.id.btn_agent_dashboard);
-        if (btnAgentDashboard != null) {
-            btnAgentDashboard.setOnClickListener(v ->
-                    startActivity(new Intent(this, com.termux.app.gui.AgentDashboardActivity.class)));
+        View btnStatusbarTerminal = findViewById(R.id.btn_statusbar_terminal);
+        if (btnStatusbarTerminal != null) {
+            btnStatusbarTerminal.setOnClickListener(v -> launchTerminal());
         }
 
+        View btnStatusbarBuild = findViewById(R.id.btn_statusbar_build);
+        if (btnStatusbarBuild != null) {
+            btnStatusbarBuild.setOnClickListener(v -> startOneTapAndroidBuild());
+        }
+
+        View btnWelcomeNewAndroid = findViewById(R.id.btn_welcome_new_android);
+        if (btnWelcomeNewAndroid != null) {
+            btnWelcomeNewAndroid.setOnClickListener(v -> createAndroidTemplatePrompt());
+        }
+
+        View tvStatusWs = findViewById(R.id.tv_statusbar_workspace);
+        if (tvStatusWs != null) {
+            tvStatusWs.setOnClickListener(v -> openDrawer());
+        }
+
+        View btnBuildApk = findViewById(R.id.btn_build_install_apk);
+        if (btnBuildApk != null) {
+            btnBuildApk.setOnClickListener(v -> startOneTapAndroidBuild());
+        }
+
+    }
+
+    private void updateStatusBarWorkspace() {
+        TextView tvStatusWs = findViewById(R.id.tv_statusbar_workspace);
+        if (tvStatusWs == null) return;
+        if (workspaceDir != null && workspaceDir.exists()) {
+            tvStatusWs.setText("📁 " + workspaceDir.getName());
+        } else {
+            tvStatusWs.setText("📁 No Workspace");
+        }
+    }
+
+    private void createAndroidTemplatePrompt() {
+        File base = (workspaceDir != null && workspaceDir.isDirectory())
+                ? workspaceDir
+                : new File(com.termux.shared.termux.TermuxConstants.TERMUX_HOME_DIR_PATH, "MyAndroidApp");
+        EditText input = new EditText(this);
+        input.setText(base.getAbsolutePath());
+        input.setTextColor(0xFFFFFFFF);
+        input.setPadding(40, 24, 40, 24);
+        new AlertDialog.Builder(this)
+                .setTitle("New Android App Template")
+                .setMessage("Creates compileSdk 34 + AndroidX + ARM64 + Cloud Build project in:")
+                .setView(input)
+                .setPositiveButton("Create", (d, w) -> {
+                    File target = new File(input.getText().toString().trim());
+                    try {
+                        String name = target.getName().isEmpty() ? "MyAndroidApp" : target.getName();
+                        String pkg = "com.example." + name.toLowerCase().replaceAll("[^a-z0-9]", "");
+                        if (pkg.endsWith(".")) pkg = pkg + "app";
+                        com.termux.app.build.AndroidBuildConfig.createPreconfiguredTemplate(
+                                target, name, pkg,
+                                com.termux.shared.termux.TermuxConstants.TERMUX_PREFIX_DIR_PATH);
+                        workspaceDir = target;
+                        currentWorkspaceDir = target;
+                        getSharedPreferences("ZeroCodePrefs", MODE_PRIVATE).edit()
+                                .putString("workspace_path", target.getAbsolutePath()).apply();
+                        loadFiles();
+                        updateStatusBarWorkspace();
+                        openDrawer();
+                        Toast.makeText(this, "Android App template created!", Toast.LENGTH_LONG).show();
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void startOneTapAndroidBuild() {
+        saveCurrentFile(false);
+        closeDrawer();
+        if (workspaceDir == null || !workspaceDir.isDirectory()) {
+            Toast.makeText(this, "Open a workspace folder first.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        com.termux.app.build.AndroidBuildManager buildManager = new com.termux.app.build.AndroidBuildManager(this);
+        if (!com.termux.app.build.AndroidBuildConfig.isAndroidProject(workspaceDir)) {
+            new AlertDialog.Builder(this)
+                    .setTitle("No Android Project Detected")
+                    .setMessage("Create a pre-configured Android App template (compileSdk 34, AndroidX, ARM64 + Cloud Build) in " + workspaceDir.getName() + "?")
+                    .setPositiveButton("Create Template", (d, w) -> {
+                        try {
+                            String name = workspaceDir.getName().isEmpty() ? "MyAndroidApp" : workspaceDir.getName();
+                            String pkg = "com.example." + name.toLowerCase().replaceAll("[^a-z0-9]", "");
+                            if (pkg.endsWith(".")) pkg = pkg + "app";
+                            com.termux.app.build.AndroidBuildConfig.createPreconfiguredTemplate(
+                                    workspaceDir, name, pkg,
+                                    com.termux.shared.termux.TermuxConstants.TERMUX_PREFIX_DIR_PATH);
+                            loadFiles();
+                            Toast.makeText(this, "Template created! Tap Build & Install APK again.", Toast.LENGTH_LONG).show();
+                        } catch (Exception e) {
+                            Toast.makeText(this, "Template error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return;
+        }
+
+        boolean heavy = com.termux.app.build.AndroidBuildConfig.isHeavyAndroidProject(workspaceDir);
+        String preferred = buildManager.getBuildMode();
+        String effective = com.termux.app.build.AndroidBuildConfig.resolveEffectiveMode(
+                preferred, buildManager.isCloudConfigured(), heavy);
+
+        if (heavy && com.termux.app.build.AndroidBuildConfig.MODE_LOCAL.equals(effective)) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Compose / NDK Project Detected")
+                    .setMessage("This project uses Compose or NDK. Local ARM64 build may be heavy — build locally or use Cloud Build?")
+                    .setPositiveButton("Build Locally (ARM64)", (d, w) ->
+                            com.termux.app.build.BuildLogDialog.runProjectBuild(
+                                    this, buildManager, workspaceDir, com.termux.app.build.AndroidBuildConfig.MODE_LOCAL))
+                    .setNeutralButton(buildManager.isCloudConfigured() ? "Use Cloud Build" : "Configure Cloud", (d, w) -> {
+                        if (buildManager.isCloudConfigured()) {
+                            com.termux.app.build.BuildLogDialog.runProjectBuild(
+                                    this, buildManager, workspaceDir, com.termux.app.build.AndroidBuildConfig.MODE_CLOUD);
+                        } else {
+                            ActivityUtils.startActivity(this, new Intent(this, SettingsActivity.class));
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return;
+        }
+
+        com.termux.app.build.BuildLogDialog.runProjectBuild(this, buildManager, workspaceDir, effective);
     }
 
     @Override
@@ -221,8 +398,19 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
                             .edit()
                             .putString("workspace_path", workspaceDir.getAbsolutePath())
                             .apply();
+
+                    new Thread(() -> {
+                        com.termux.app.build.AndroidBuildManager bm = new com.termux.app.build.AndroidBuildManager(this);
+                        com.termux.app.build.AndroidBuildConfig.syncWorkspaceAgentDocs(
+                                workspaceDir,
+                                com.termux.shared.termux.TermuxConstants.TERMUX_PREFIX_DIR_PATH,
+                                bm.getBuildMode(),
+                                bm.checkLocalToolchain().isReady(),
+                                bm.getCloudSummary());
+                    }, "sync-ws-md").start();
                             
                     loadFiles();
+                    updateStatusBarWorkspace();
                     openDrawer();
                     Toast.makeText(this, "Workspace Opened: " + path, Toast.LENGTH_SHORT).show();
                     
@@ -401,15 +589,21 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
     }
 
     private void saveCurrentFile() {
+        saveCurrentFile(true);
+    }
+
+    private void saveCurrentFile(boolean showToast) {
         if (currentEditingFile != null) {
             try (java.io.FileWriter fw = new java.io.FileWriter(currentEditingFile)) {
                 fw.write(etHomeCode.getText().toString());
                 openFiles.put(currentEditingFile, etHomeCode.getText().toString());
-                Toast.makeText(this, "File saved successfully", Toast.LENGTH_SHORT).show();
-                
-
+                if (showToast) {
+                    Toast.makeText(this, "File saved successfully", Toast.LENGTH_SHORT).show();
+                }
             } catch (Exception e) {
-                Toast.makeText(this, "Failed to save file", Toast.LENGTH_SHORT).show();
+                if (showToast) {
+                    Toast.makeText(this, "Failed to save file", Toast.LENGTH_SHORT).show();
+                }
             }
         }
     }
@@ -511,6 +705,7 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
                 if (tvEmptySubtext != null) tvEmptySubtext.setText("Swipe right or tap the top-left menu to browse your workspace.");
                 
                 if (fileAdapter != null) fileAdapter.setFiles(new java.util.ArrayList<>());
+                updateStatusBarWorkspace();
                 closeDrawer();
                 Toast.makeText(this, "Workspace Closed", Toast.LENGTH_SHORT).show();
             });
@@ -719,43 +914,7 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
             File file = files.get(position);
             holder.itemName.setText(file.getName());
 
-            if (file.getName().equals("..") || file.isDirectory()) {
-                holder.itemIcon.setImageResource(R.drawable.ic_folder_new);
-                holder.itemIcon.setColorFilter(0xFFFACC15); // Yellow tint for folders
-            } else {
-                String fileName = file.getName().toLowerCase();
-                if (fileName.endsWith(".py")) {
-                    holder.itemIcon.setImageResource(R.drawable.ic_python);
-                    holder.itemIcon.clearColorFilter();
-                } else if (fileName.endsWith(".js")) {
-                    holder.itemIcon.setImageResource(R.drawable.ic_javascript);
-                    holder.itemIcon.clearColorFilter();
-                } else if (fileName.endsWith(".ts")) {
-                    holder.itemIcon.setImageResource(R.drawable.ic_typescript);
-                    holder.itemIcon.clearColorFilter();
-                } else if (fileName.endsWith(".java")) {
-                    holder.itemIcon.setImageResource(R.drawable.ic_java);
-                    holder.itemIcon.clearColorFilter();
-                } else if (fileName.endsWith(".cpp") || fileName.endsWith(".c") || fileName.endsWith(".h") || fileName.endsWith(".hpp")) {
-                    holder.itemIcon.setImageResource(R.drawable.ic_cpp);
-                    holder.itemIcon.clearColorFilter();
-                } else if (fileName.endsWith(".html") || fileName.endsWith(".htm")) {
-                    holder.itemIcon.setImageResource(R.drawable.ic_html);
-                    holder.itemIcon.clearColorFilter();
-                } else if (fileName.endsWith(".css")) {
-                    holder.itemIcon.setImageResource(R.drawable.ic_css);
-                    holder.itemIcon.clearColorFilter();
-                } else if (fileName.endsWith(".kt") || fileName.endsWith(".kts")) {
-                    holder.itemIcon.setImageResource(R.drawable.ic_kotlin);
-                    holder.itemIcon.clearColorFilter();
-                } else if (fileName.endsWith(".rs")) {
-                    holder.itemIcon.setImageResource(R.drawable.ic_rust);
-                    holder.itemIcon.clearColorFilter();
-                } else {
-                    holder.itemIcon.setImageResource(R.drawable.ic_file);
-                    holder.itemIcon.setColorFilter(0xFFA0A0A0); // Grey tint for generic files
-                }
-            }
+            FileExplorerAdapter.bindFileIcon(holder.itemIcon, file);
 
             holder.itemView.setOnClickListener(v -> {
                 if (file.getName().equals("..")) {

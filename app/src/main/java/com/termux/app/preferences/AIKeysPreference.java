@@ -1,17 +1,22 @@
 package com.termux.app.preferences;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
+import android.widget.TextView;
 import androidx.appcompat.widget.SwitchCompat;
 
 import androidx.preference.Preference;
@@ -90,60 +95,116 @@ public class AIKeysPreference extends Preference {
         etAnthropicBaseUrl.setText(agentManager.getAnthropicBaseUrl());
         etAnthropicModel.setText(agentManager.getAnthropicModel());
 
-        // Setup visibility toggles
+        // Setup sleek VS Code-style agent rows
         LinearLayout agentsToggleContainer = (LinearLayout) holder.findViewById(R.id.agents_toggle_container);
         if (agentsToggleContainer != null) {
             agentsToggleContainer.removeAllViews();
+            Context ctx = getContext();
+            int padH = dp(ctx, 12);
+            int padV = dp(ctx, 10);
+            int rowGap = dp(ctx, 8);
+            int badgePadH = dp(ctx, 10);
+            int badgePadV = dp(ctx, 5);
+            ColorStateList trackTint = new ColorStateList(
+                new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                new int[]{0xFF007ACC, 0xFF3A3A44}
+            );
+            ColorStateList thumbTint = new ColorStateList(
+                new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                new int[]{Color.WHITE, 0xFFB4B8C0}
+            );
+
             for (CLIAgentManager.CLIAgent agent : CLIAgentManager.AGENTS) {
-                LinearLayout row = new LinearLayout(getContext());
+                LinearLayout row = new LinearLayout(ctx);
                 row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setBackgroundResource(R.drawable.bg_settings_row);
+                row.setPadding(padH, padV, padH, padV);
                 LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                rowParams.setMargins(0, 8, 0, 8);
+                rowParams.setMargins(0, 0, 0, rowGap);
                 row.setLayoutParams(rowParams);
 
-                SwitchCompat switchView = new SwitchCompat(getContext());
-                LinearLayout.LayoutParams switchParams = new LinearLayout.LayoutParams(
+                // Left column: emoji + name and short description
+                LinearLayout infoCol = new LinearLayout(ctx);
+                infoCol.setOrientation(LinearLayout.VERTICAL);
+                LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(
                         0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f
                 );
-                switchView.setLayoutParams(switchParams);
-                
-                switchView.setText(agent.name);
-                switchView.setTextColor(Color.WHITE);
+                infoParams.setMarginEnd(dp(ctx, 8));
+                infoCol.setLayoutParams(infoParams);
+
+                TextView tvName = new TextView(ctx);
+                String prefix = (agent.iconEmoji != null && !agent.iconEmoji.isEmpty())
+                        ? agent.iconEmoji + "  " : "";
+                tvName.setText(prefix + agent.name);
+                tvName.setTextColor(0xFFF3F4F6);
+                tvName.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f);
+                tvName.setTypeface(null, Typeface.BOLD);
+                tvName.setSingleLine(true);
+                tvName.setEllipsize(TextUtils.TruncateAt.END);
+                infoCol.addView(tvName);
+
+                if (agent.description != null && !agent.description.isEmpty()) {
+                    TextView tvDesc = new TextView(ctx);
+                    tvDesc.setText(agent.description);
+                    tvDesc.setTextColor(0xFF8E929B);
+                    tvDesc.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f);
+                    tvDesc.setSingleLine(true);
+                    tvDesc.setEllipsize(TextUtils.TruncateAt.END);
+                    infoCol.addView(tvDesc);
+                }
+                row.addView(infoCol);
+
+                // Middle action pill: Ready badge or Install button
+                if (agent.installCommand != null && !agent.installCommand.isEmpty()) {
+                    boolean installed = agentManager.isAgentInstalled(agent);
+                    TextView pill = new TextView(ctx);
+                    pill.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f);
+                    pill.setTypeface(null, Typeface.BOLD);
+                    pill.setPadding(badgePadH, badgePadV, badgePadH, badgePadV);
+                    LinearLayout.LayoutParams pillParams = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                    );
+                    pillParams.setMarginEnd(dp(ctx, 10));
+                    pill.setLayoutParams(pillParams);
+
+                    if (installed) {
+                        pill.setText("✓ Ready");
+                        pill.setTextColor(0xFF4ADE80);
+                        pill.setBackgroundResource(R.drawable.bg_badge_installed);
+                    } else {
+                        pill.setText("Install");
+                        pill.setTextColor(Color.WHITE);
+                        pill.setBackgroundResource(R.drawable.bg_btn_install_pill);
+                        pill.setClickable(true);
+                        pill.setFocusable(true);
+                        pill.setOnClickListener(v -> {
+                            android.content.Intent intent = new android.content.Intent(ctx, com.termux.app.TermuxActivity.class);
+                            intent.setAction("com.xyzide.app.INSTALL_AGENT");
+                            intent.putExtra("agent_id", agent.id);
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                            ctx.startActivity(intent);
+                        });
+                    }
+                    row.addView(pill);
+                }
+
+                SwitchCompat switchView = new SwitchCompat(ctx);
                 switchView.setShowText(false);
                 switchView.setTextOn("");
                 switchView.setTextOff("");
+                switchView.setTrackTintList(trackTint);
+                switchView.setThumbTintList(thumbTint);
                 switchView.setChecked(agentManager.isAgentEnabled(agent.id));
-                switchView.setPadding(0, 16, 0, 16);
                 switchView.setOnCheckedChangeListener((buttonView, isChecked) -> {
                     agentManager.setAgentEnabled(agent.id, isChecked);
                     updateSpinnerAdapter();
                 });
-                
                 row.addView(switchView);
-
-                if (agent.installCommand != null && !agent.installCommand.isEmpty() && !agentManager.isAgentInstalled(agent)) {
-                    android.widget.Button btnDownload = new android.widget.Button(getContext());
-                    btnDownload.setText("Download");
-                    btnDownload.setTextColor(Color.WHITE);
-                    btnDownload.setTextSize(12f);
-                    
-                    LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.WRAP_CONTENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT
-                    );
-                    btnDownload.setLayoutParams(btnParams);
-                    btnDownload.setOnClickListener(v -> {
-                        android.content.Intent intent = new android.content.Intent(getContext(), com.termux.app.TermuxActivity.class);
-                        intent.setAction("com.xyzide.app.INSTALL_AGENT");
-                        intent.putExtra("agent_id", agent.id);
-                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                        getContext().startActivity(intent);
-                    });
-                    row.addView(btnDownload);
-                }
 
                 agentsToggleContainer.addView(row);
             }
@@ -213,5 +274,10 @@ public class AIKeysPreference extends Preference {
                 agentManager.setAnthropicModel(s.toString());
             }
         });
+    }
+
+    private static int dp(Context ctx, int dp) {
+        return Math.round(TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, dp, ctx.getResources().getDisplayMetrics()));
     }
 }

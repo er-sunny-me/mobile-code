@@ -203,4 +203,37 @@ public class AIChatManager {
             }
         }
     }
+
+    /**
+     * Handle a captured child-app crash by copying a ready-to-paste fix prompt and
+     * sending it straight into an active agent TUI (or printing the crash header in shell).
+     */
+    public void handleCrashFixRequest(String crashPackage, String workspacePath) {
+        String prompt = com.termux.app.build.DebugCrashReporterConfig.buildCrashFixPrompt(crashPackage);
+        try {
+            android.content.ClipboardManager cm =
+                    (android.content.ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) {
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("Fix Crash Prompt", prompt));
+            }
+        } catch (Exception ignored) {
+        }
+
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(() -> {
+            TerminalSession session = activity.getCurrentSession();
+            if (session == null) return;
+            String runningId = session.getPid() > 0
+                    ? CLIAgentManager.findRunningAgentIdForSessionPid(session.getPid())
+                    : null;
+            if (runningId != null) {
+                session.write(prompt + "\r");
+            } else {
+                android.widget.Toast.makeText(
+                        activity,
+                        "Saved CRASH_REPORT.md — prompt copied to clipboard!",
+                        android.widget.Toast.LENGTH_LONG).show();
+            }
+        }, 700);
+    }
 }

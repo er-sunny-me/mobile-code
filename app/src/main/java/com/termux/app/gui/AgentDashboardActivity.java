@@ -110,7 +110,7 @@ public class AgentDashboardActivity extends AppCompatActivity implements AgentLi
         String env = AgentRunner.isWorkshopAvailable()
                 ? "Ubuntu workshop" : "Termux (open the terminal once to set up the workshop)";
         String text = installed + " of " + statuses.size() + " agents ready in the " + env
-                + ". Install one to use it from Agent Chat, or open it in the terminal.";
+                + ". Install one and open it in the terminal.";
         if (misplaced > 0) {
             text = installed + " of " + statuses.size() + " agents ready in the " + env + ". "
                     + misplaced + " found elsewhere (wrong place) — tap Reinstall on them.";
@@ -191,7 +191,7 @@ public class AgentDashboardActivity extends AppCompatActivity implements AgentLi
         if (!agentManager.isAgentEnabled(agent.id)) {
             agentManager.setAgentEnabled(agent.id, true);
         }
-        Toast.makeText(this, agent.name + " selected for Agent Chat", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, agent.name + " selected as default agent", Toast.LENGTH_SHORT).show();
         refreshStatuses();
     }
 

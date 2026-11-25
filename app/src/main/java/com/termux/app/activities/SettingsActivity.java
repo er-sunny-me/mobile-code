@@ -45,8 +45,8 @@ public class SettingsActivity extends AppCompatActivity {
         AppCompatActivityUtils.setToolbar(this, com.termux.shared.R.id.toolbar);
         androidx.appcompat.widget.Toolbar toolbar = findViewById(com.termux.shared.R.id.toolbar);
         if (toolbar != null) {
-            toolbar.setBackgroundColor(android.graphics.Color.BLACK);
-            toolbar.setTitleTextColor(android.graphics.Color.WHITE);
+            toolbar.setBackgroundColor(0xFF0D0D10);
+            toolbar.setTitleTextColor(0xFFF3F4F6);
         }
         AppCompatActivityUtils.setShowBackButtonInActionBar(this, true);
     }
@@ -79,6 +79,19 @@ public class SettingsActivity extends AppCompatActivity {
                     configureUpdateCheckPreference(context);
                 }
             }.start();
+        }
+
+        @Override
+        public void onViewCreated(@NonNull android.view.View view, Bundle savedInstanceState) {
+            super.onViewCreated(view, savedInstanceState);
+            setDivider(null);
+            setDividerHeight(0);
+            androidx.recyclerview.widget.RecyclerView list = getListView();
+            if (list != null) {
+                list.setBackgroundColor(0xFF0D0D10);
+                list.setPadding(0, 0, 0, 32);
+                list.setClipToPadding(false);
+            }
         }
 
         private void configureUpdateCheckPreference(@NonNull Context context) {

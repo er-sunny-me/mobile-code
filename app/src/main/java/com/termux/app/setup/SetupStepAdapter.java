@@ -70,13 +70,17 @@ public class SetupStepAdapter extends RecyclerView.Adapter<SetupStepAdapter.Hold
             default:
                 glyph = "○";
                 label = "QUEUED";
-                color = 0xFF555555;
+                color = 0xFF9CA3AF;
                 break;
         }
         holder.icon.setText(glyph);
         holder.icon.setTextColor(color);
         holder.status.setText(label);
         holder.status.setTextColor(color);
+        holder.status.setBackgroundResource(
+                step.status == SetupStep.Status.DONE
+                        ? R.drawable.bg_badge_installed
+                        : R.drawable.bg_badge_missing);
     }
 
     @Override

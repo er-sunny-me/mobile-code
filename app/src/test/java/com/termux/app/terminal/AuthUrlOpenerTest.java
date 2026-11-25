@@ -231,4 +231,14 @@ public class AuthUrlOpenerTest {
         assertEquals(AuthUrlOpener.AuthTextState.COMPLETE,
                 AuthUrlOpener.assessAuthText(sb.toString()).state);
     }
+
+    @Test
+    public void hardWrappedWithIndentationReconstructsFullUrl() {
+        StringBuilder indented = new StringBuilder();
+        for (int i = 0; i < FULL_OAUTH_URL.length(); i += 52) {
+            if (i > 0) indented.append("\n  ");
+            indented.append(FULL_OAUTH_URL, i, Math.min(FULL_OAUTH_URL.length(), i + 52));
+        }
+        assertEquals(FULL_OAUTH_URL, AuthUrlOpener.findAuthUrl(agyOutput(indented.toString())));
+    }
 }

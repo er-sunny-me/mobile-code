@@ -112,7 +112,29 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
                         : null;
                 if (runningAgentId != null) {
                     CLIAgentManager.CLIAgent running = CLIAgentManager.findAgent(runningAgentId);
+                    String targetOpenCodeSid = "opencode".equals(runningAgentId)
+                            ? CLIAgentManager.extractSessionFlagArg(commandToRun) : null;
+                    String attachedOpenCodeSid = "opencode".equals(runningAgentId)
+                            ? CLIAgentManager.getOpenCodeAttachedSessionIdInSession(session.getPid()) : null;
                     if ("opencode".equals(runningAgentId)
+                            && targetOpenCodeSid != null
+                            && !targetOpenCodeSid.equals(attachedOpenCodeSid)) {
+                        // The current terminal is either standalone or attached to a
+                        // different/empty OpenCode session; open a fresh linked tab
+                        // attached to the GUI's exact session so all GUI messages
+                        // show immediately in the CLI.
+                        addNewSession(false, "OpenCode");
+                        final String cwdExec = cwdToCd;
+                        final String fileExec = fileToRun;
+                        final String cmdExec = commandToRun;
+                        authScanHandler.postDelayed(() -> {
+                            TerminalSession linked = mActivity.getCurrentSession();
+                            if (linked != null) {
+                                writeExecuteCommands(linked, cwdExec, fileExec, cmdExec);
+                            }
+                        }, 300);
+                        mActivity.showToast("🔗 Opened linked OpenCode session in new tab", false);
+                    } else if ("opencode".equals(runningAgentId)
                             && OpenCodeLink.isServerUp()
                             && CLIAgentManager.isStandaloneOpenCodeTuiInSession(session.getPid())) {
                         // A standalone TUI can never join the shared
@@ -130,25 +152,30 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
                                 true);
                     }
                 } else {
-                    if (cwdToCd != null) {
-                        session.write("cd \"" + cwdToCd + "\" && clear\n");
-                    }
-                    if (fileToRun != null) {
-                        String cmd = "";
-                        if (fileToRun.endsWith(".py")) cmd = "python \"" + fileToRun + "\"";
-                        else if (fileToRun.endsWith(".js")) cmd = "node \"" + fileToRun + "\"";
-                        else if (fileToRun.endsWith(".sh")) cmd = "bash \"" + fileToRun + "\"";
-                        else cmd = "cat \"" + fileToRun + "\"";
-                        session.write(cmd + "\n");
-                    }
-                    if (commandToRun != null) {
-                        session.write(commandToRun + "\n");
-                    }
+                    writeExecuteCommands(session, cwdToCd, fileToRun, commandToRun);
                 }
             }
             intent.removeExtra("com.xyzide.execute.cwd"); // Consume it so it only runs once
             intent.removeExtra("com.xyzide.execute.file_to_run");
             intent.removeExtra("com.xyzide.execute.command");
+        }
+    }
+
+    private static void writeExecuteCommands(TerminalSession session, String cwdToCd,
+                                             String fileToRun, String commandToRun) {
+        if (cwdToCd != null) {
+            session.write(CLIAgentManager.cdWorkspaceShell(cwdToCd) + "clear\n");
+        }
+        if (fileToRun != null) {
+            String cmd;
+            if (fileToRun.endsWith(".py")) cmd = "python \"" + fileToRun + "\"";
+            else if (fileToRun.endsWith(".js")) cmd = "node \"" + fileToRun + "\"";
+            else if (fileToRun.endsWith(".sh")) cmd = "bash \"" + fileToRun + "\"";
+            else cmd = "cat \"" + fileToRun + "\"";
+            session.write(cmd + "\n");
+        }
+        if (commandToRun != null) {
+            session.write(commandToRun + "\n");
         }
     }
 
@@ -291,10 +318,6 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         if (transcript == null || transcript.isEmpty()) return;
         String tail = transcript.length() > AUTH_SCAN_TAIL_CHARS
                 ? transcript.substring(transcript.length() - AUTH_SCAN_TAIL_CHARS) : transcript;
-        // Keep the Sign-in button's highlight honest on every scan: an
-        // auth host anywhere in the tail means a sign-in flow is around.
-        mActivity.runOnUiThread(() ->
-                mActivity.setSignInButtonHighlighted(AuthUrlOpener.containsAuthHostHint(tail)));
         if (AuthUrlOpener.findAuthUrl(tail) != null) {
             mActivity.runOnUiThread(() ->
                     AuthUrlOpener.openAuthUrlIfPresent(mActivity, tail, "agent"));

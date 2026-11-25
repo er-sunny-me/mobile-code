@@ -673,6 +673,19 @@ public class CLIAgentManager {
     }
 
     /**
+     * Map thinking token budget to the {@code agy --effort} flag value
+     * ({@code low|medium|high|max}), or {@code null} when thinking is Off.
+     * {@code agy} rejects {@code --thinking}.
+     */
+    static String antigravityEffortFlag(int thinkingTokens) {
+        if (thinkingTokens <= 0) return null;
+        if (thinkingTokens <= 2048) return "low";
+        if (thinkingTokens <= 8192) return "medium";
+        if (thinkingTokens <= 16384) return "high";
+        return "max";
+    }
+
+    /**
      * What "Default" means for an agent's model: the CLI's OWN default.
      *
      * <p>This used to return invented per-agent model ids ("deepseek-r1" for
@@ -814,7 +827,9 @@ public class CLIAgentManager {
         if (agentId == null) agentId = "";
         switch (agentId) {
             case "antigravity":
-                return lower.startsWith("gemini-") || lower.startsWith("gemini/");
+                return lower.startsWith("gemini-") || lower.startsWith("gemini/")
+                        || lower.startsWith("claude-") || lower.startsWith("gpt-oss")
+                        || lower.startsWith("gpt-4") || lower.startsWith("gpt-5");
             case "claude_code":
             case "kiro":
                 return lower.startsWith("claude-") || lower.startsWith("claude/");
@@ -885,6 +900,8 @@ public class CLIAgentManager {
     public static List<String> parseModelsFromCliOutput(String agentId, String output) {
         List<String> found = new ArrayList<>();
         if (output == null || output.trim().isEmpty()) return found;
+        // Strip ANSI escape sequences so colored TUI/CLI model listings match cleanly.
+        output = output.replaceAll("\u001B\\[[0-9;?]*[ -/]*[@-~]", "");
         Set<String> seen = new LinkedHashSet<>();
         boolean providerModelAgent = isProviderModelAgent(agentId);
 
@@ -900,7 +917,7 @@ public class CLIAgentManager {
         String[] lines = output.split("\\r?\\n");
         for (String line : lines) {
             String trimmed = line.trim();
-            trimmed = trimmed.replaceFirst("^[-*•\\d.]+\\s*", "").trim();
+            trimmed = trimmed.replaceFirst("^[│|>✓✔*•●\\-\\d.\\[\\]xX]+\\s*", "").trim();
             int spaceIdx = trimmed.indexOf(' ');
             String candidate = (spaceIdx > 0) ? trimmed.substring(0, spaceIdx) : trimmed;
             if (providerModelAgent && looksLikeProviderModelId(candidate)) {
@@ -993,11 +1010,34 @@ public class CLIAgentManager {
         return candidate.length() >= 3 ? candidate : null;
     }
 
+    /**
+     * Extract a CLI-marked default model from {@code models} output (lines
+     * marked with {@code (default)}, {@code [default]}, {@code (current)}, or
+     * a leading {@code *} / {@code ✓}), or null when none is marked.
+     */
+    static String parseDefaultModelFromCliOutput(String agentId, String output) {
+        if (output == null || output.trim().isEmpty()) return null;
+        String clean = output.replaceAll("\u001B\\[[0-9;?]*[ -/]*[@-~]", "");
+        for (String line : clean.split("\\r?\\n")) {
+            String t = line.trim();
+            String lower = t.toLowerCase();
+            boolean marked = lower.contains("(default)") || lower.contains("[default]")
+                    || lower.contains("(current)") || t.startsWith("* ")
+                    || t.startsWith("✓ ") || t.startsWith("✔ ");
+            if (!marked) continue;
+            List<String> parsed = parseModelsFromCliOutput(agentId, t);
+            if (!parsed.isEmpty()) return parsed.get(0);
+        }
+        return null;
+    }
+
     public static String buildModelProbeCommand(CLIAgent agent) {
         if (agent == null) return null;
         switch (agent.id) {
             case "antigravity":
-                return "export PATH=\"$HOME/.local/bin:$PATH\"; hash -r 2>/dev/null || true; { agy models 2>&1 || agy --help 2>&1; }";
+                return "export PATH=\"$HOME/.local/bin:/root/.local/bin:$PATH\"; hash -r 2>/dev/null || true; "
+                        + "{ if command -v timeout >/dev/null 2>&1; then timeout 10 agy models </dev/null 2>&1 || timeout 10 agy models list </dev/null 2>&1; else agy models </dev/null 2>&1 || agy models list </dev/null 2>&1; fi; "
+                        + "agy --help </dev/null 2>&1; }";
             case "claude_code":
                 return "{ claude models 2>&1 || claude --help 2>&1; }";
             case "codex":
@@ -1065,6 +1105,10 @@ public class CLIAgentManager {
 
         if (!parsed.isEmpty()) {
             saveLiveModelsCache(agent.id, parsed);
+            String detectedDefault = parseDefaultModelFromCliOutput(agent.id, rawOutput);
+            if (detectedDefault != null && !detectedDefault.isEmpty()) {
+                prefs.edit().putString(KEY_AGENT_REAL_MODEL_PREFIX + agent.id, detectedDefault).apply();
+            }
             return parsed;
         }
 
@@ -1080,6 +1124,33 @@ public class CLIAgentManager {
                 new Handler(Looper.getMainLooper()).post(() -> callback.onModelsLoaded(models));
             }
         }).start();
+    }
+
+    /**
+     * Automatically pre-fetch live models and real default models in the
+     * background for all installed agents so the user never has to tap
+     * Refresh manually per agent.
+     */
+    public void prefetchInstalledModelsAsync(List<CLIAgent> agents, Runnable onAnyLoaded) {
+        if (agents == null || agents.isEmpty()) return;
+        new Thread(() -> {
+            boolean any = false;
+            for (CLIAgent agent : agents) {
+                if (agent == null || "custom".equals(agent.id)) continue;
+                if (!isAgentInstalled(agent)) continue;
+                List<String> models = queryLiveModelsSync(agent);
+                String real = fetchRealDefaultModel(agent.id);
+                if (real != null) {
+                    prefs.edit().putString(KEY_AGENT_REAL_MODEL_PREFIX + agent.id, real).apply();
+                }
+                if ((models != null && !models.isEmpty()) || real != null) {
+                    any = true;
+                }
+            }
+            if (any && onAnyLoaded != null) {
+                new Handler(Looper.getMainLooper()).post(onAnyLoaded);
+            }
+        }, "prefetch-agent-models").start();
     }
 
     // ------------------------------------------------------------------
@@ -1292,6 +1363,23 @@ public class CLIAgentManager {
                     String model = parseCodexTomlModel(
                             readSmallTextFile(new File(home, ".codex/config.toml")));
                     if (model != null) return model;
+                }
+                return null;
+            }
+            case "antigravity": {
+                for (File home : agentHomeDirs()) {
+                    for (String rel : new String[]{
+                            ".antigravity/settings.json",
+                            ".config/antigravity/settings.json",
+                            ".gemini/antigravity/settings.json",
+                            ".gemini/settings.json"}) {
+                        String content = readSmallTextFile(new File(home, rel));
+                        if (content == null) continue;
+                        for (String field : new String[]{"model", "defaultModel", "selectedModel"}) {
+                            String model = parseJsonStringField(content, field);
+                            if (model != null && !model.isEmpty()) return model;
+                        }
+                    }
                 }
                 return null;
             }
@@ -1534,6 +1622,59 @@ public class CLIAgentManager {
     }
 
     /**
+     * If {@code cmdline} is an {@code opencode attach} process, return the
+     * {@code --session} / {@code -s} value it was launched with, {@code ""}
+     * when {@code attach} was launched without {@code --session}, or
+     * {@code null} when {@code cmdline} is not {@code opencode attach}.
+     * Pure and unit-testable.
+     */
+    public static String extractOpenCodeAttachSessionId(String cmdline) {
+        if (cmdline == null) return null;
+        if (!"opencode".equals(matchAgentInCmdline(cmdline))) return null;
+        String[] argv = cmdline.split("\u0000");
+        boolean isAttach = false;
+        for (int i = 0; i < argv.length; i++) {
+            String t = argv[i].trim();
+            if ("attach".equals(t)) {
+                isAttach = true;
+            } else if (isAttach && ("--session".equals(t) || "-s".equals(t)) && i + 1 < argv.length) {
+                return argv[i + 1].trim();
+            } else if (isAttach && t.startsWith("--session=")) {
+                return t.substring("--session=".length()).trim();
+            }
+        }
+        return isAttach ? "" : null;
+    }
+
+    /**
+     * Return the {@code --session} id of an {@code opencode attach} process
+     * running in {@code sessionPid}, {@code ""} if attached without a session
+     * flag, or {@code null} if no {@code opencode attach} is running there.
+     */
+    public static String getOpenCodeAttachedSessionIdInSession(int sessionPid) {
+        if (sessionPid <= 0) return null;
+        try {
+            java.util.Map<Integer, java.util.List<Integer>> children = readProcChildrenMap(sessionPid);
+            for (int pid : collectDescendantPids(sessionPid, children)) {
+                String cmdline = readSmallTextFile(new File("/proc/" + pid + "/cmdline"));
+                String sid = extractOpenCodeAttachSessionId(cmdline);
+                if (sid != null) return sid;
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    /** Extract the {@code --session <id>} value from a shell command string, or null. */
+    public static String extractSessionFlagArg(String command) {
+        if (command == null || command.isEmpty()) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(?:^|\\s)--session(?:=|\\s+)['\"]?([^\\s'\";&|]+)['\"]?")
+                .matcher(command);
+        return m.find() ? m.group(1) : null;
+    }
+
+    /**
      * Parent→children map for the tree under {@code rootPid}. Fast path:
      * {@code /proc/<pid>/task/<pid>/children} walked recursively (only the
      * session's own tree is touched). Fallback when no children file is
@@ -1598,7 +1739,7 @@ public class CLIAgentManager {
         if (saved == null || saved.isEmpty() || saved.equalsIgnoreCase("default")) {
             return defaultModel;
         }
-        if (isAlienModelForAgent(agentId, saved)) {
+        if (isAlienModelForAgent(agentId, saved) && !getCachedLiveModels(agentId).contains(saved)) {
             setAgentModel(agentId, null);
             return defaultModel;
         }
@@ -1639,11 +1780,14 @@ public class CLIAgentManager {
         String termuxHomeBin = TermuxConstants.TERMUX_HOME_DIR_PATH;
         String termuxOpen = TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/termux-open-url";
         String shimBody = "#!/bin/bash\n"
+                + "# Xyz.IDE xdg-open shim v2\n"
                 + "url=\"$1\"\n"
-                + "for opener in \"" + termuxOpen + "\" \"" + TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/bin/termux-open-url\" termux-open-url termux-open; do\n"
-                + "  if command -v \"$opener\" >/dev/null 2>&1; then \"$opener\" \"$url\" >/dev/null 2>&1 & exit 0; fi\n"
-                + "done\n"
                 + "echo \"Open this URL on your phone browser: $url\"\n"
+                + "if [ -z \"$PROOT_TMP_DIR\" ]; then\n"
+                + "  for opener in \"" + termuxOpen + "\" \"" + TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/bin/termux-open-url\" termux-open-url termux-open; do\n"
+                + "    if command -v \"$opener\" >/dev/null 2>&1; then \"$opener\" \"$url\" >/dev/null 2>&1 & break; fi\n"
+                + "  done\n"
+                + "fi\n"
                 + "exit 0\n";
         // TERMUX_PKG_NO_MIRROR_SELECT (exported below): keep pkg on the bootstrap
         // default Cloudflare mirror instead of its test-everything weighted
@@ -1651,7 +1795,7 @@ public class CLIAgentManager {
         // Related: proot-distro installs must name ncurses + ncurses-utils in the
         // same transaction or an old ncurses-utils pin breaks apt (see wizard).
         return "mkdir -p ~/.local/bin"
-            + " && { [ -f ~/.local/bin/xdg-open ] || { printf '%b' '" + shimBody.replace("'", "'\\''").replace("\n", "\\n") + "' > ~/.local/bin/xdg-open && chmod +x ~/.local/bin/xdg-open; }; }"
+            + " && { grep -q 'Xyz.IDE xdg-open shim v2' ~/.local/bin/xdg-open 2>/dev/null || { printf '%b' '" + shimBody.replace("'", "'\\''").replace("\n", "\\n") + "' > ~/.local/bin/xdg-open && chmod +x ~/.local/bin/xdg-open; }; }"
             + " && export PATH=\"$HOME/.local/bin:$HOME/.opencode/bin:$HOME/.grok/bin:"
             + termuxHomeBin + "/.local/bin:" + termuxHomeBin + "/.opencode/bin:"
             + termuxHomeBin + "/.grok/bin:/root/.local/bin:/root/.opencode/bin:/root/.grok/bin:$PATH\""
@@ -1698,10 +1842,11 @@ public class CLIAgentManager {
      * Build the terminal command to launch the given agent interactively.
      */
     public String buildLaunchCommand(CLIAgent agent, String prompt, String workspace) {
+        syncAgentContextDocsForWorkspace(workspace);
         if (agent.id.equals("custom")) {
             String customCmd = prefs.getString(KEY_CUSTOM_COMMAND, "");
             if (customCmd.isEmpty()) return "echo 'No custom command configured.'";
-            return "cd " + shellEscape(workspace) + " && " + customCmd;
+            return cdWorkspaceShell(workspace) + customCmd;
         }
 
         String cmd = agent.runCommandTemplate
@@ -1734,7 +1879,23 @@ public class CLIAgentManager {
             cmd = anthropicExports() + cmd;
         }
 
-        return "cd " + shellEscape(workspace) + " && " + cmd;
+        return cdWorkspaceShell(workspace) + cmd;
+    }
+
+    private void syncAgentContextDocsForWorkspace(String workspace) {
+        if (workspace == null || workspace.trim().isEmpty() || context == null) return;
+        try {
+            File dir = new File(workspace);
+            if (!dir.isDirectory()) return;
+            com.termux.app.build.AndroidBuildManager bm = new com.termux.app.build.AndroidBuildManager(context);
+            com.termux.app.build.AndroidBuildConfig.syncWorkspaceAgentDocs(
+                    dir,
+                    TermuxConstants.TERMUX_PREFIX_DIR_PATH,
+                    bm.getBuildMode(),
+                    bm.checkLocalToolchain().isReady(),
+                    bm.getCloudSummary());
+        } catch (Exception ignored) {
+        }
     }
 
     /**
@@ -1756,7 +1917,7 @@ public class CLIAgentManager {
         if (agent.id.equals("custom")) {
             String customCmd = prefs.getString(KEY_CUSTOM_COMMAND, "");
             if (customCmd.isEmpty()) return null;
-            return "cd " + shellEscape(workspace) + " && " + shellPrelude() + customCmd;
+            return cdWorkspaceShell(workspace) + shellPrelude() + customCmd;
         }
 
         String cmd = template
@@ -1777,18 +1938,9 @@ public class CLIAgentManager {
             if (selectedModel != null && !selectedModel.isEmpty() && !selectedModel.equals("default")) {
                 cmd = cmd + " --model " + escapeForDoubleQuotes(selectedModel);
             }
-            // Every level maps to the --thinking word the chip names (agy's
-            // own model listings use the same low/medium/high words — see
-            // dashedDisplayNameCandidate). Low/Medium used to append nothing,
-            // so the chip promised a budget the CLI never received.
-            if (thinkingTokens == 0) {
-                cmd = cmd + " --thinking off";
-            } else if (thinkingTokens <= 2048) {
-                cmd = cmd + " --thinking low";
-            } else if (thinkingTokens <= 8192) {
-                cmd = cmd + " --thinking medium";
-            } else {
-                cmd = cmd + " --thinking high";
+            String effort = antigravityEffortFlag(thinkingTokens);
+            if (effort != null) {
+                cmd = cmd + " --effort " + effort;
             }
         } else if (agent.id.equals("codex")) {
             if (selectedModel != null && !selectedModel.isEmpty() && !selectedModel.equals("default")) {
@@ -1888,7 +2040,7 @@ public class CLIAgentManager {
             cmd = claudeEnv.toString() + anthropicExports() + cmd;
         }
 
-        return "cd " + shellEscape(workspace) + " && " + cmd;
+        return cdWorkspaceShell(workspace) + cmd;
     }
 
     /**
@@ -2039,10 +2191,11 @@ public class CLIAgentManager {
      * (Ubuntu proot has no Android browser integration).
      */
     public String buildLoginCommand(CLIAgent agent, String workspace) {
+        syncAgentContextDocsForWorkspace(workspace);
         if (agent.id.equals("custom")) {
             String customCmd = prefs.getString(KEY_CUSTOM_COMMAND, "");
             if (customCmd.isEmpty()) return "echo 'No custom command configured.'";
-            return "cd " + shellEscape(workspace) + " && " + shellPrelude() + customCmd;
+            return cdWorkspaceShell(workspace) + shellPrelude() + customCmd;
         }
         String interactive = agent.runCommandTemplate
                 .replace("{prompt}", "")
@@ -2062,7 +2215,7 @@ public class CLIAgentManager {
         if (agent.id.equals("antigravity")) {
             cmd = cmd + " ; echo ''; echo '[Xyz.IDE] If no browser opened, copy the URL above into your phone browser, sign in, and paste the code back here.'";
         }
-        return "cd " + shellEscape(workspace) + " && " + cmd;
+        return cdWorkspaceShell(workspace) + cmd;
     }
 
     /**
@@ -2134,7 +2287,35 @@ public class CLIAgentManager {
     }
 
     private String shellEscape(String path) {
-        return "'" + path.replace("'", "'\\''") + "'";
+        return "'" + (path == null ? "" : path).replace("'", "'\\''") + "'";
+    }
+
+    /**
+     * Build a safe {@code cd} prefix for {@code workspace} that works both
+     * on native Termux ({@code /storage/emulated/0/...}) and inside proot
+     * workshops where shared storage is bound at {@code /mnt/sdcard/...}.
+     * Falls back with {@code || true} so an unmapped directory never aborts
+     * the agent launch command.
+     */
+    static String cdWorkspaceShell(String workspace) {
+        if (workspace == null || workspace.trim().isEmpty()) return "";
+        String w = workspace.trim();
+        String escaped = "'" + w.replace("'", "'\\''") + "'";
+        String prootAlt = null;
+        if (w.startsWith("/storage/emulated/0/")) {
+            prootAlt = "/mnt/sdcard/" + w.substring("/storage/emulated/0/".length());
+        } else if (w.equals("/storage/emulated/0")) {
+            prootAlt = "/mnt/sdcard";
+        } else if (w.startsWith("/sdcard/")) {
+            prootAlt = "/mnt/sdcard/" + w.substring("/sdcard/".length());
+        } else if (w.equals("/sdcard")) {
+            prootAlt = "/mnt/sdcard";
+        }
+        if (prootAlt != null) {
+            String altEscaped = "'" + prootAlt.replace("'", "'\\''") + "'";
+            return "{ cd " + escaped + " 2>/dev/null || cd " + altEscaped + " 2>/dev/null || true; } && ";
+        }
+        return "{ cd " + escaped + " 2>/dev/null || true; } && ";
     }
 
     /**

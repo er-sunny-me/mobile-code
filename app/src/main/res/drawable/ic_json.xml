@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Curly braces JSON yellow -->
+    <path
+        android:fillColor="#CBCB41"
+        android:pathData="M8.5,5C7.12,5 6,6.12 6,7.5v2.25c0,0.69 -0.56,1.25 -1.25,1.25H4v2h0.75c0.69,0 1.25,0.56 1.25,1.25V16.5C6,17.88 7.12,19 8.5,19H10v-2H8.5c-0.28,0 -0.5,-0.22 -0.5,-0.5v-2.25c0,-0.98 -0.45,-1.85 -1.16,-2.42C7.55,11.26 8,10.39 8,9.41V7.5C8,7.22 8.22,7 8.5,7H10V5H8.5zM15.5,5H14v2h1.5c0.28,0 0.5,0.22 0.5,0.5v1.91c0,0.98 0.45,1.85 1.16,2.42C16.45,12.4 16,13.27 16,14.25v2.25c0,0.28 -0.22,0.5 -0.5,0.5H14v2h1.5c1.38,0 2.5,-1.12 2.5,-2.5v-2.25c0,-0.69 0.56,-1.25 1.25,-1.25H20v-2h-0.75c-0.69,0 -1.25,-0.56 -1.25,-1.25V7.5C18,6.12 16.88,5 15.5,5z"/>
+</vector>

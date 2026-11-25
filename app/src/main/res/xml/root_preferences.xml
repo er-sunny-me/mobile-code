@@ -3,26 +3,37 @@
     <com.termux.app.preferences.AIKeysPreference
         app:key="ai_settings_keys" />
 
+    <com.termux.app.preferences.AndroidBuildPreference
+        app:key="android_build_settings" />
+
+    <com.termux.app.preferences.BrowserPreference
+        app:key="browser_hybrid_settings" />
+
     <Preference
         app:key="termux"
         app:title="@string/termux_preferences_title"
         app:summary="@string/termux_preferences_summary"
+        app:layout="@layout/preference_vsc_item"
         app:fragment="com.termux.app.fragments.settings.TermuxPreferencesFragment"/>
 
     <Preference
         app:key="sync_workshop"
         app:title="@string/sync_workshop_title"
-        app:summary="@string/sync_workshop_summary"/>
+        app:summary="@string/sync_workshop_summary"
+        app:layout="@layout/preference_vsc_item"/>
 
     <Preference
         app:key="setup_wizard"
         app:title="@string/setup_wizard_title"
-        app:summary="@string/setup_wizard_summary"/>
+        app:summary="@string/setup_wizard_summary"
+        app:layout="@layout/preference_vsc_item"/>
 
     <SwitchPreference
         app:key="auto_ai_debug"
         app:title="@string/auto_ai_debug_title"
         app:summary="@string/auto_ai_debug_summary"
+        app:layout="@layout/preference_vsc_item_plain"
+        app:widgetLayout="@layout/preference_vsc_switch_widget"
         app:defaultValue="true"/>
 
     <Preference
@@ -56,6 +67,8 @@
     <Preference
         app:key="about"
         app:title="@string/about_preference_title"
+        app:summary="Version, device info and installed packages"
+        app:layout="@layout/preference_vsc_item"
         app:persistent="false"/>
     <!-- app:layout="@layout/preference_markdown_text" -->
 
@@ -63,6 +76,7 @@
         app:key="check_update"
         app:title="Check for Updates"
         app:summary="Check if a new version is available"
+        app:layout="@layout/preference_vsc_item"
         app:persistent="false"/>
 
     <Preference

@@ -10,9 +10,9 @@
 
     <ImageView
         android:id="@+id/iv_file_icon"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:src="@android:drawable/ic_menu_help" />
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@drawable/ic_file" />
 
     <TextView
         android:id="@+id/tv_file_name"

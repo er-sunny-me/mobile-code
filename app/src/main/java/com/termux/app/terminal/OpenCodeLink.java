@@ -116,7 +116,25 @@ public class OpenCodeLink {
         }
     }
 
-    private final Handler main = new Handler(Looper.getMainLooper());
+    private final Handler main;
+
+    public OpenCodeLink() {
+        Handler h = null;
+        try {
+            Looper looper = Looper.getMainLooper();
+            if (looper != null) h = new Handler(looper);
+        } catch (Throwable ignored) {
+        }
+        this.main = h;
+    }
+
+    private void postToMain(Runnable r) {
+        if (main != null) {
+            main.post(r);
+        } else {
+            r.run();
+        }
+    }
 
     // ---- Server process state (shared across activities) ----
     private static Process serverProcess;
@@ -150,6 +168,11 @@ public class OpenCodeLink {
     private volatile boolean turnCancelled;
     private volatile HttpURLConnection activeSse;
     private volatile String activeSessionId;
+
+    // ---- Background session watcher (shows CLI / background turns in GUI) ----
+    private volatile boolean watching;
+    private volatile HttpURLConnection watchSse;
+    private Thread watchThread;
 
     /** True when the shared server answered a health check recently (cached, no I/O). */
     public static boolean isServerUp() {
@@ -259,7 +282,7 @@ public class OpenCodeLink {
      */
     static String buildServeCommand(String workspace) {
         return "cd " + CLIAgentManager.singleQuote(workspace)
-            + " && export PATH=\"$HOME/.opencode/bin:$PATH\""
+            + " && export PATH=\"$HOME/.local/bin:$HOME/.opencode/bin:/usr/local/bin:$PATH\""
             + " && export OPENCODE_CONFIG_CONTENT=\""
             + escapeForDoubleQuotes(currentConfigContent()) + "\""
             + " && exec opencode serve --hostname 127.0.0.1 --port " + PORT;
@@ -295,7 +318,7 @@ public class OpenCodeLink {
      * adopt sessions from).
      */
     static String buildTerminalCommand(String sessionId) {
-        return "export PATH=\"$HOME/.opencode/bin:$PATH\" && "
+        return "export PATH=\"$HOME/.local/bin:$HOME/.opencode/bin:/usr/local/bin:$PATH\" && "
                 + buildEnsureServerShell()
                 + "; " + buildAttachCommand(sessionId);
     }
@@ -633,7 +656,7 @@ public class OpenCodeLink {
             // 1) Server up? (restart when the workspace changed under it)
             if (!ensureServerRunning(workspace)) {
                 if (!turnCancelled) {
-                    main.post(() -> listener.onUnavailable(
+                    postToMain(() -> listener.onUnavailable(
                             "OpenCode server could not be started or did not come up in time."));
                 }
                 return;
@@ -647,11 +670,11 @@ public class OpenCodeLink {
                     sessionWorkspace = workspace;
                 }
             } catch (Exception e) {
-                main.post(() -> listener.onUnavailable("Could not create OpenCode session: " + e.getMessage()));
+                postToMain(() -> listener.onUnavailable("Could not create OpenCode session: " + e.getMessage()));
                 return;
             }
             activeSessionId = sid;
-            main.post(() -> listener.onLinked(sid));
+            postToMain(() -> listener.onLinked(sid));
 
             // 3) Show what is already in that session (e.g. written from
             // the terminal) BEFORE this turn's prompt is posted, so the
@@ -833,7 +856,7 @@ public class OpenCodeLink {
                     restartsUsed++;
                     boolean recovered = restartServerAndRecover(workspace, sid, state, listener);
                     if (recovered) {
-                        main.post(() -> listener.onTool("♻️ server restarted — turn recovered"));
+                        postToMain(() -> listener.onTool("♻️ server restarted — turn recovered"));
                         finishOnce(listener, finishLock, finished, null);
                     } else {
                         finishOnce(listener, finishLock, finished,
@@ -1040,14 +1063,14 @@ public class OpenCodeLink {
                 && fetchedReasoning.length() >= state.reasoningSnapshot().length()
                 && !fetchedReasoning.equals(state.reasoningSnapshot())) {
             final String s = fetchedReasoning;
-            main.post(() -> listener.onReasoning(s));
+            postToMain(() -> listener.onReasoning(s));
         }
         String displayText = stripReasoningFromText(fetchedText, fetchedReasoning);
         if (displayText != null && !displayText.trim().isEmpty()
                 && displayText.length() >= state.textSnapshot().length()
                 && !displayText.equals(state.textSnapshot())) {
             final String s = displayText;
-            main.post(() -> listener.onText(s));
+            postToMain(() -> listener.onText(s));
         }
         return (fetchedText != null && !fetchedText.trim().isEmpty())
                 || (fetchedReasoning != null && !fetchedReasoning.trim().isEmpty());
@@ -1220,7 +1243,7 @@ public class OpenCodeLink {
         if (unseen.isEmpty()) return false;
         for (HistoryMessage m : unseen) historyShownIds.add(m.id);
         final List<HistoryMessage> deliver = unseen;
-        main.post(() -> listener.onHistory(deliver));
+        postToMain(() -> listener.onHistory(deliver));
         return true;
     }
 
@@ -1254,6 +1277,232 @@ public class OpenCodeLink {
             if (sid == null) return;
             emitHistory(sid, listener);
         }, "opencode-prime").start();
+    }
+
+    /**
+     * Ensure the shared server and session exist before opening the terminal,
+     * so {@link #getSessionId()} is guaranteed to be populated and
+     * {@code opencode attach --session <id>} lands in the exact GUI session.
+     */
+    public void ensureSessionForTerminal(final String workspace, final Runnable onReady) {
+        if (onReady == null) return;
+        if (sessionId != null && healthyCached()) {
+            onReady.run();
+            return;
+        }
+        new Thread(() -> {
+            turnCancelled = false;
+            if (ensureServerRunning(workspace)) {
+                try {
+                    synchronized (OpenCodeLink.class) {
+                        String sid = resolveSessionLocked(workspace, true);
+                        if (sid != null) sessionWorkspace = workspace;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            postToMain(onReady);
+        }, "opencode-term-prep").start();
+    }
+
+    /**
+     * Start watching the shared OpenCode session in the background while the
+     * GUI chat is visible. Surfaces any turns started from the CLI or still
+     * running in the background (live text, reasoning, tools, and user
+     * messages) into the GUI in real time. Safe to call repeatedly.
+     */
+    public synchronized void startWatching(final String workspace, final Listener listener) {
+        if (listener == null) return;
+        stopWatching();
+        watching = true;
+        watchThread = new Thread(() -> runWatchLoop(workspace, listener), "opencode-watch");
+        watchThread.setDaemon(true);
+        watchThread.start();
+    }
+
+    /** Stop the background session watcher (call in onPause / before a GUI turn). */
+    public synchronized void stopWatching() {
+        watching = false;
+        HttpURLConnection sse = watchSse;
+        if (sse != null) {
+            try {
+                sse.disconnect();
+            } catch (Exception ignored) {
+            }
+            watchSse = null;
+        }
+        if (watchThread != null) {
+            watchThread.interrupt();
+            watchThread = null;
+        }
+    }
+
+    private void runWatchLoop(final String workspace, final Listener listener) {
+        boolean triedStart = false;
+        while (watching) {
+            turnCancelled = false;
+            boolean up = healthyCached();
+            if (!up && !triedStart) {
+                triedStart = true;
+                up = ensureServerRunning(workspace);
+            } else if (!up) {
+                up = probeHealthy();
+            }
+            if (!up) {
+                sleepQuietly(5000);
+                continue;
+            }
+            String sid = null;
+            try {
+                synchronized (OpenCodeLink.class) {
+                    sid = resolveSessionLocked(workspace, false);
+                    if (sid != null) sessionWorkspace = workspace;
+                }
+            } catch (Exception ignored) {
+            }
+            if (sid == null) {
+                sleepQuietly(2000);
+                continue;
+            }
+            activeSessionId = sid;
+            emitHistory(sid, listener);
+
+            TurnState state = new TurnState();
+            Boolean idle = isSessionIdleTri(sid);
+            final boolean[] turnActive = {Boolean.FALSE.equals(idle)};
+            if (turnActive[0]) {
+                final String linkedSid = sid;
+                postToMain(() -> listener.onLinked(linkedSid));
+                emitRecoveredMessages(sid, state, listener);
+            }
+            HttpURLConnection sse = null;
+            try {
+                sse = open("GET", "/event", 8000, 0);
+                sse.setRequestProperty("Accept", "text/event-stream");
+                watchSse = sse;
+                int code = sse.getResponseCode();
+                if (code == 200) {
+                    try (BufferedReader br = new BufferedReader(
+                            new InputStreamReader(sse.getInputStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        StringBuilder data = new StringBuilder();
+                        while (watching && (line = br.readLine()) != null) {
+                            if (line.isEmpty()) {
+                                if (data.length() > 0) {
+                                    state = handleWatchEvent(data.toString(), sid, state,
+                                            listener, turnActive);
+                                    data.setLength(0);
+                                }
+                            } else if (line.startsWith("data:")) {
+                                data.append(line.substring(5).trim());
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (sse != null) sse.disconnect();
+                if (watchSse == sse) watchSse = null;
+            }
+            if (watching) {
+                sleepQuietly(2000);
+            }
+        }
+    }
+
+    TurnState handleWatchEvent(String json, String sid, TurnState state,
+                               Listener listener, boolean[] turnActive) {
+        return handleWatchEvent(json, sid, state, listener, turnActive, true);
+    }
+
+    TurnState handleWatchEvent(String json, String sid, TurnState state,
+                               Listener listener, boolean[] turnActive,
+                               boolean syncHistoryOnEvents) {
+        Event ev = parseEvent(json);
+        if (ev == null || ev.type == null) return state;
+        if (ev.sessionID != null && !ev.sessionID.equals(sid)) return state;
+        switch (ev.type) {
+            case "message.updated": {
+                if (ev.messageID != null && ev.messageRole != null) {
+                    emitSnapshots(state.classifyMessage(ev.messageID, ev.messageRole), listener);
+                    if ("user".equals(ev.messageRole)) {
+                        if (syncHistoryOnEvents) emitHistory(sid, listener);
+                        if (!turnActive[0]) {
+                            turnActive[0] = true;
+                            postToMain(() -> listener.onLinked(sid));
+                        }
+                    } else if ("assistant".equals(ev.messageRole) && !turnActive[0]) {
+                        turnActive[0] = true;
+                        postToMain(() -> listener.onLinked(sid));
+                    }
+                }
+                break;
+            }
+            case "message.part.updated":
+            case "message.part.delta": {
+                if (ev.partType == null || ev.partID == null) break;
+                if (!turnActive[0]) {
+                    turnActive[0] = true;
+                    postToMain(() -> listener.onLinked(sid));
+                }
+                if (ev.partType.equals("tool")) {
+                    final String label = ev.toolLabel;
+                    if (label != null && !label.equals(state.lastToolLabel)) {
+                        state.lastToolLabel = label;
+                        postToMain(() -> listener.onTool(label));
+                    }
+                } else if (ev.partType.equals("text") || ev.partType.equals("reasoning")) {
+                    emitSnapshots(state.applyPartEvent(ev), listener);
+                }
+                break;
+            }
+            case "permission.asked": {
+                if (ev.permissionID != null) {
+                    final String pid = ev.permissionID;
+                    new Thread(() -> replyPermission(sid, pid), "opencode-perm").start();
+                }
+                break;
+            }
+            case "session.error": {
+                state.errorText = ev.errorText != null ? ev.errorText : "OpenCode reported an error.";
+                emitSnapshots(state.flushPendingAsAssistant(), listener);
+                final String err = state.errorText;
+                if (turnActive[0]) {
+                    turnActive[0] = false;
+                    postToMain(() -> listener.onFinished(err));
+                }
+                return new TurnState();
+            }
+            case "session.status": {
+                if ("busy".equals(ev.statusType) && !turnActive[0]) {
+                    turnActive[0] = true;
+                    postToMain(() -> listener.onLinked(sid));
+                } else if ("idle".equals(ev.statusType)) {
+                    emitSnapshots(state.flushPendingAsAssistant(), listener);
+                    if (syncHistoryOnEvents) emitHistory(sid, listener);
+                    final String err = state.errorText;
+                    if (turnActive[0]) {
+                        turnActive[0] = false;
+                        postToMain(() -> listener.onFinished(err));
+                    }
+                    return new TurnState();
+                }
+                break;
+            }
+            case "session.idle": {
+                emitSnapshots(state.flushPendingAsAssistant(), listener);
+                if (syncHistoryOnEvents) emitHistory(sid, listener);
+                final String err = state.errorText;
+                if (turnActive[0]) {
+                    turnActive[0] = false;
+                    postToMain(() -> listener.onFinished(err));
+                }
+                return new TurnState();
+            }
+            default:
+                break;
+        }
+        return state;
     }
 
     /**
@@ -1312,7 +1561,7 @@ public class OpenCodeLink {
             }
             if (reasoning.length() > 0) {
                 final String s = reasoning.toString();
-                main.post(() -> listener.onReasoning(s));
+                postToMain(() -> listener.onReasoning(s));
             }
             // Same dedupe as the streaming path: interleaved-reasoning
             // models can mirror their monologue into the text parts too.
@@ -1320,7 +1569,7 @@ public class OpenCodeLink {
                     text.toString(), reasoning.toString());
             if (displayText != null && !displayText.trim().isEmpty()) {
                 final String s = displayText;
-                main.post(() -> listener.onText(s));
+                postToMain(() -> listener.onText(s));
             }
             Map<String, Object> info = r == null ? null : MiniJson.asMap(r.get("info"));
             Object err = info == null ? null : info.get("error");
@@ -1370,7 +1619,7 @@ public class OpenCodeLink {
                     final String label = ev.toolLabel;
                     if (label != null && !label.equals(state.lastToolLabel)) {
                         state.lastToolLabel = label;
-                        main.post(() -> listener.onTool(label));
+                        postToMain(() -> listener.onTool(label));
                     }
                 } else if (ev.partType.equals("text") || ev.partType.equals("reasoning")) {
                     emitSnapshots(state.applyPartEvent(ev), listener);
@@ -1412,11 +1661,11 @@ public class OpenCodeLink {
         if (snaps == null) return;
         if (snaps[0] != null) {
             final String s = snaps[0];
-            main.post(() -> listener.onText(s));
+            postToMain(() -> listener.onText(s));
         }
         if (snaps[1] != null) {
             final String s = snaps[1];
-            main.post(() -> listener.onReasoning(s));
+            postToMain(() -> listener.onReasoning(s));
         }
     }
 
@@ -1426,7 +1675,7 @@ public class OpenCodeLink {
             finished[0] = true;
         }
         if (!turnCancelled) {
-            main.post(() -> listener.onFinished(error));
+            postToMain(() -> listener.onFinished(error));
         }
     }
 

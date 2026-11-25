@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Gradle cyan/teal elephant-inspired gear/crest -->
+    <path
+        android:fillColor="#02A8F3"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10s10,-4.48 10,-10S17.52,2 12,2zM12,19.5c-4.14,0 -7.5,-3.36 -7.5,-7.5S7.86,4.5 12,4.5c2.28,0 4.32,1.02 5.69,2.63l-2.18,1.59C14.66,7.67 13.41,7 12,7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5c2.42,0 4.44,-1.72 4.9,-4H12v-2.5h7.35c0.1,0.48 0.15,0.98 0.15,1.5C19.5,16.14 16.14,19.5 12,19.5z"/>
+</vector>

@@ -62,6 +62,7 @@ public class SetupWizardActivity extends AppCompatActivity {
     private CLIAgentManager cliManager;
     private TextView logView;
     private ScrollView logScroll;
+    private TextView tvLogToggle;
     private TextView btnStart;
     private TextView btnSkip;
     private TextView tvDistroDetail;
@@ -107,7 +108,18 @@ public class SetupWizardActivity extends AppCompatActivity {
         buildAgentRows();
 
         logView = findViewById(R.id.tv_setup_log);
-        logScroll = (ScrollView) logView.getParent();
+        logScroll = findViewById(R.id.scroll_setup_log);
+        tvLogToggle = findViewById(R.id.tv_setup_log_toggle);
+        View logHeader = findViewById(R.id.setup_log_header);
+        if (logHeader != null && logScroll != null) {
+            logHeader.setOnClickListener(v -> {
+                boolean opening = logScroll.getVisibility() != View.VISIBLE;
+                logScroll.setVisibility(opening ? View.VISIBLE : View.GONE);
+                if (tvLogToggle != null) {
+                    tvLogToggle.setText(opening ? "Setup log  ▾" : "Setup log  ▸");
+                }
+            });
+        }
         btnStart = findViewById(R.id.btn_setup_start);
         btnSkip = findViewById(R.id.btn_setup_skip);
         tvDistroDetail = findViewById(R.id.tv_distro_detail);
@@ -130,13 +142,13 @@ public class SetupWizardActivity extends AppCompatActivity {
         });
 
         steps.add(new SetupStep(STEP_STORAGE, "Storage access",
-                "Lets agents read and write your project files."));
+                "Read & write workspace files on device storage."));
         steps.add(new SetupStep(STEP_BOOTSTRAP, "Termux base system",
-                "Core shell, pkg manager and tools."));
+                "Core shell, pkg manager & tools."));
         steps.add(new SetupStep(STEP_DISTRO, "Linux system",
-                "Ubuntu is bundled in the app — instant. Debian/Alpine download on demand. Agents download once on first setup."));
+                "Ubuntu offline instant bundle or Debian/Alpine."));
         steps.add(new SetupStep(STEP_AGENTS, "Coding agents",
-                "agy, opencode, grok, kiro + npm agents (Claude, Codex, Copilot, Kilo). None are selected by default — tick the ones you want."));
+                "Installs only the agents ticked below."));
         adapter.setItems(steps);
         refreshDistroButtons();
 
@@ -158,6 +170,10 @@ public class SetupWizardActivity extends AppCompatActivity {
             if (allDone()) {
                 finish();
                 return;
+            }
+            if (logScroll != null && logScroll.getVisibility() != View.VISIBLE) {
+                logScroll.setVisibility(View.VISIBLE);
+                if (tvLogToggle != null) tvLogToggle.setText("Setup log  ▾");
             }
             startSetup();
         });
@@ -224,7 +240,7 @@ public class SetupWizardActivity extends AppCompatActivity {
     // ------------------------------------------------------------------
 
     private void refreshDistroButtons() {
-        paintDistro((TextView) distroUbuntu, "ubuntu".equals(selectedDistro), "Ubuntu ★ recommended");
+        paintDistro((TextView) distroUbuntu, "ubuntu".equals(selectedDistro), "Ubuntu ★");
         paintDistro((TextView) distroDebian, "debian".equals(selectedDistro), "Debian");
         paintDistro((TextView) distroAlpine, "alpine".equals(selectedDistro), "Alpine");
         String detail;
@@ -294,7 +310,8 @@ public class SetupWizardActivity extends AppCompatActivity {
 
     private void paintDistro(TextView view, boolean selected, String label) {
         view.setText(selected ? label + " ✓" : label);
-        view.setBackgroundResource(selected ? R.drawable.bg_red_button : R.drawable.bg_fab_dark);
+        view.setBackgroundResource(selected ? R.drawable.bg_btn_install_pill : R.drawable.bg_settings_row);
+        view.setTextColor(selected ? 0xFFFFFFFF : 0xFFE5E7EB);
     }
 
     private SetupStep findStep(String id) {

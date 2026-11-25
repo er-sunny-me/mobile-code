@@ -59,7 +59,7 @@
         android:background="@color/zc_bg_dark"
         android:paddingHorizontal="16dp"
         android:paddingVertical="10dp"
-        android:text="Agents are installed into the Termux environment. Tap Install to download one, then use it from the Agent Chat screen."
+        android:text="Agents are installed into the Termux environment. Tap Install to download one, then open it in the terminal."
         android:textColor="@color/zc_text_secondary"
         android:textSize="12sp" />
 

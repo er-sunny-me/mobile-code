@@ -720,4 +720,55 @@ public class OpenCodeLinkTest {
         assertEquals(original, OpenCodeLink.MiniJson.str(
                 OpenCodeLink.MiniJson.asMap(parsed), "v"));
     }
+
+    @Test
+    public void terminalCommandIncludesLocalBinAndSession() {
+        String cmd = OpenCodeLink.buildTerminalCommand("ses_abc");
+        assertTrue(cmd.contains("$HOME/.local/bin"));
+        assertTrue(cmd.contains("$HOME/.opencode/bin"));
+        assertTrue(cmd.contains("opencode attach http://127.0.0.1:4096 --session ses_abc"));
+    }
+
+    @Test
+    public void watchEventStreamsBackgroundTurnAndResetsOnIdle() {
+        OpenCodeLink link = new OpenCodeLink();
+        final java.util.List<String> events = new java.util.ArrayList<>();
+        OpenCodeLink.Listener listener = new OpenCodeLink.Listener() {
+            @Override public void onLinked(String sessionId) { events.add("linked:" + sessionId); }
+            @Override public void onText(String snapshot) { events.add("text:" + snapshot); }
+            @Override public void onReasoning(String snapshot) { events.add("reasoning:" + snapshot); }
+            @Override public void onTool(String label) { events.add("tool:" + label); }
+            @Override public void onFinished(String error) { events.add("finished:" + error); }
+            @Override public void onUnavailable(String reason) { events.add("unavail:" + reason); }
+        };
+
+        OpenCodeLink.TurnState state = new OpenCodeLink.TurnState();
+        boolean[] turnActive = {false};
+
+        state = link.handleWatchEvent(
+                "{\"type\":\"message.updated\",\"properties\":{\"sessionID\":\"ses_1\",\"info\":{\"id\":\"m_u\",\"role\":\"user\"}}}",
+                "ses_1", state, listener, turnActive, false);
+        state = link.handleWatchEvent(
+                "{\"type\":\"message.updated\",\"properties\":{\"sessionID\":\"ses_1\",\"info\":{\"id\":\"m_a\",\"role\":\"assistant\"}}}",
+                "ses_1", state, listener, turnActive, false);
+        state = link.handleWatchEvent(
+                "{\"type\":\"message.part.updated\",\"properties\":{\"sessionID\":\"ses_1\",\"part\":{\"id\":\"p_r\",\"messageID\":\"m_a\",\"type\":\"reasoning\",\"text\":\"Thinking\"}}}",
+                "ses_1", state, listener, turnActive, false);
+        state = link.handleWatchEvent(
+                "{\"type\":\"message.part.updated\",\"properties\":{\"sessionID\":\"ses_1\",\"part\":{\"id\":\"p_t\",\"messageID\":\"m_a\",\"type\":\"tool\",\"tool\":\"read\",\"state\":{\"status\":\"running\"}}}}",
+                "ses_1", state, listener, turnActive, false);
+        state = link.handleWatchEvent(
+                "{\"type\":\"message.part.updated\",\"properties\":{\"sessionID\":\"ses_1\",\"part\":{\"id\":\"p_x\",\"messageID\":\"m_a\",\"type\":\"text\",\"text\":\"Done\"}}}",
+                "ses_1", state, listener, turnActive, false);
+        state = link.handleWatchEvent(
+                "{\"type\":\"session.idle\",\"properties\":{\"sessionID\":\"ses_1\"}}",
+                "ses_1", state, listener, turnActive, false);
+
+        assertTrue(events.contains("linked:ses_1"));
+        assertTrue(events.contains("reasoning:Thinking"));
+        assertTrue(events.contains("tool:read running"));
+        assertTrue(events.contains("text:Done"));
+        assertTrue(events.contains("finished:null"));
+        assertTrue(!turnActive[0]);
+    }
 }

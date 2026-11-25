@@ -242,6 +242,12 @@ public final class TerminalView extends View {
 
             @Override
             public boolean onDoubleTap(MotionEvent event) {
+                // In mouse-tracking TUIs (e.g. OpenCode), rapid taps shouldn't suppress opening the soft keyboard.
+                if (mEmulator != null && mEmulator.isMouseTrackingActive() && !event.isFromSource(InputDevice.SOURCE_MOUSE)) {
+                    requestFocus();
+                    mClient.onSingleTapUp(event);
+                    return true;
+                }
                 // Do not treat is as a single confirmed tap - it may be followed by zoom.
                 return false;
             }

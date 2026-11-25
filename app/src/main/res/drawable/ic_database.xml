@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Database gold cylinder -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M12,3C7.58,3 4,4.79 4,7v10c0,2.21 3.58,4 8,4s8,-1.79 8,-4V7C20,4.79 16.42,3 12,3zM12,5c3.31,0 6,1.12 6,2s-2.69,2 -6,2s-6,-1.12 -6,-2S8.69,5 12,5zM18,17c0,0.88 -2.69,2 -6,2s-6,-1.12 -6,-2v-2.23c1.58,0.77 3.71,1.23 6,1.23s4.42,-0.46 6,-1.23V17zM18,12c0,0.88 -2.69,2 -6,2s-6,-1.12 -6,-2V9.77C7.58,10.54 9.71,11 12,11s4.42,-0.46 6,-1.23V12z"/>
+</vector>

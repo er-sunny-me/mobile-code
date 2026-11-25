@@ -132,16 +132,26 @@ public class AuthUrlOpener {
                     j++;
                 }
                 if (j >= text.length()) break;
-                if (!isUrlChar(text.charAt(j))) break;
+                int k = j;
+                while (k < text.length() && (text.charAt(k) == ' ' || text.charAt(k) == '\t')) {
+                    k++;
+                }
+                if (k >= text.length() || !isUrlChar(text.charAt(k))) break;
                 boolean missingKeys = !hasRequiredKeys(sb);
                 int segLen = i - segStart;
-                boolean cross = missingKeys
-                        || (newlines < 2 && nextLineIsPureUrlSegment(text, j))
-                        || (newlines < 2 && wrapWidth > 0 && segLen >= wrapWidth - 1);
+                boolean cross;
+                if (k == j) {
+                    cross = missingKeys
+                            || (newlines < 2 && nextLineIsPureUrlSegment(text, j))
+                            || (newlines < 2 && wrapWidth > 0 && segLen >= wrapWidth - 1);
+                } else {
+                    // Indented continuation line (e.g. TUI layout padding).
+                    cross = newlines < 2 && (missingKeys || nextLineIsPureUrlSegment(text, k));
+                }
                 if (!cross) break;
                 if (segLen > wrapWidth) wrapWidth = segLen;
-                i = j;
-                segStart = j;
+                i = k;
+                segStart = k;
                 continue;
             }
             break;
@@ -163,6 +173,9 @@ public class AuthUrlOpener {
             i++;
         }
         if (n < 20) return false;
+        while (i < text.length() && (text.charAt(i) == ' ' || text.charAt(i) == '\t')) {
+            i++;
+        }
         // The run must end the line (newline or end of text), not trail
         // into prose on the same line.
         return i >= text.length() || text.charAt(i) == '\n' || text.charAt(i) == '\r';

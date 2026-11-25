@@ -5,155 +5,257 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Main Content (Existing Home Screen) -->
+    <!-- Main VS Code Mobile Workbench -->
     <RelativeLayout
         android:id="@+id/home_root"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/zc_app_bg"
+        android:background="#1E1E1E"
         android:fitsSystemWindows="true">
 
-        <!-- Top App Bar -->
+        <!-- Top Workbench Bar -->
         <LinearLayout
             android:id="@+id/top_app_bar"
             android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:orientation="horizontal"
+            android:layout_height="52dp"
+            android:background="#252526"
             android:gravity="center_vertical"
-            android:paddingHorizontal="16dp"
-            android:background="@color/zc_app_bg">
+            android:orientation="horizontal"
+            android:paddingHorizontal="10dp">
 
-            <!-- Hamburger Menu (Actually opens the new drawer) -->
             <ImageButton
                 android:id="@+id/btn_menu"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_sort_by_size"
-                app:tint="@color/zc_text_white" />
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Explorer"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_vsc_menu"
+                app:tint="#CCCCCC" />
 
-            <!-- Title -->
             <TextView
                 android:id="@+id/tv_app_title"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
                 android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:text="@string/app_name"
-                android:textColor="@color/zc_text_white"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:layout_marginStart="16dp" />
+                android:textColor="#E0E0E0"
+                android:textSize="16sp"
+                android:textStyle="bold" />
 
             <!-- Run Button (Editor mode only) -->
             <ImageButton
                 android:id="@+id/btn_home_editor_run"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_media_play"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Run file"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_vsc_run"
                 android:visibility="gone"
-                app:tint="@color/zc_text_gray" />
+                app:tint="#4EC9B0" />
 
             <!-- Save Button (Editor mode only) -->
             <ImageButton
                 android:id="@+id/btn_home_editor_save"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_save"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Save file"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_vsc_save"
                 android:visibility="gone"
-                app:tint="@color/zc_text_gray" />
+                app:tint="#4FC1FF" />
 
-            <!-- Close Button (Editor mode only) -->
+            <!-- Close Tab Button (Editor mode only) -->
             <ImageButton
                 android:id="@+id/btn_home_editor_close"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Close tab"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_term_close"
                 android:visibility="gone"
-                app:tint="@color/zc_text_gray" />
+                app:tint="#F48771" />
+
+            <!-- Built-in WebView Browser Button -->
+            <ImageButton
+                android:id="@+id/btn_browser"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Open Browser"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_browser_globe"
+                app:tint="#38BDF8" />
 
             <!-- Settings Button -->
             <ImageButton
                 android:id="@+id/btn_settings"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Settings"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
                 android:src="@drawable/ic_settings"
-                app:tint="@color/zc_text_gray" />
-
-            <!-- Agent Chat GUI -->
-            <ImageButton
-                android:id="@+id/btn_agent_chat"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Agent Chat"
-                android:src="@android:drawable/ic_menu_edit"
-                app:tint="@color/zc_primary_red" />
-
-            <!-- Manage / install coding agents -->
-            <ImageButton
-                android:id="@+id/btn_agent_dashboard"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Coding Agents"
-                android:src="@android:drawable/ic_menu_manage"
-                app:tint="@color/zc_text_gray" />
+                app:tint="#CCCCCC" />
         </LinearLayout>
 
-        <!-- Empty State Container (Centered) -->
+        <View
+            android:id="@+id/top_bar_divider"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_below="@id/top_app_bar"
+            android:background="#333333" />
+
+        <!-- Bottom VS Code Status Bar -->
+        <LinearLayout
+            android:id="@+id/vsc_status_bar"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_alignParentBottom="true"
+            android:background="#007ACC"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
+
+            <TextView
+                android:id="@+id/tv_statusbar_workspace"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="center_vertical"
+                android:maxLines="1"
+                android:text="📁 No Workspace"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btn_statusbar_build"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_marginEnd="6dp"
+                android:background="#1AFFFFFF"
+                android:gravity="center"
+                android:paddingHorizontal="8dp"
+                android:text="▶ Build"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btn_statusbar_browser"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_marginEnd="6dp"
+                android:background="#1AFFFFFF"
+                android:gravity="center"
+                android:paddingHorizontal="8dp"
+                android:text="🌐 Browser"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btn_statusbar_terminal"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:background="#1AFFFFFF"
+                android:gravity="center"
+                android:paddingHorizontal="8dp"
+                android:text=">_ CLI"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Empty / Welcome Screen (VS Code Mobile Style) -->
         <LinearLayout
             android:id="@+id/empty_state_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_below="@id/top_app_bar"
+            android:layout_above="@id/vsc_status_bar"
+            android:layout_below="@id/top_bar_divider"
             android:gravity="center"
             android:orientation="vertical"
+            android:padding="24dp"
             android:visibility="visible">
 
             <ImageView
-                android:layout_width="120dp"
-                android:layout_height="120dp"
+                android:layout_width="76dp"
+                android:layout_height="76dp"
+                android:layout_marginBottom="16dp"
                 android:src="@drawable/ic_folder_new"
-                app:tint="@color/zc_text_muted"
-                android:layout_marginBottom="16dp" />
+                app:tint="#007ACC" />
 
             <TextView
                 android:id="@+id/tv_empty_state_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
                 android:text="@string/app_name"
-                android:textColor="@color/zc_text_secondary"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
-                
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
             <TextView
                 android:id="@+id/tv_empty_state_subtext"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Swipe right or tap the top-left menu to browse your workspace."
-                android:textColor="@color/zc_text_muted"
-                android:textSize="14sp"
+                android:layout_marginBottom="24dp"
                 android:gravity="center"
-                android:paddingHorizontal="32dp"
-                android:layout_marginBottom="24dp" />
+                android:paddingHorizontal="16dp"
+                android:text="Open a folder, create an Android app, or launch the CLI terminal."
+                android:textColor="#9E9E9E"
+                android:textSize="13sp" />
 
             <Button
                 android:id="@+id/btn_open_folder_main"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:backgroundTint="@color/zc_red_primary"
-                android:textColor="@color/zc_text_white"
+                android:layout_width="240dp"
+                android:layout_height="46dp"
+                android:layout_marginBottom="10dp"
+                android:backgroundTint="#007ACC"
                 android:text="Open Workspace Folder"
-                android:paddingHorizontal="32dp"
-                android:paddingVertical="12dp"
-                android:gravity="center"
                 android:textAllCaps="false"
-                android:textSize="16sp" />
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_welcome_new_android"
+                android:layout_width="240dp"
+                android:layout_height="44dp"
+                android:layout_marginBottom="10dp"
+                android:backgroundTint="#2D2D30"
+                android:text="New Android App Template"
+                android:textAllCaps="false"
+                android:textColor="#E0E0E0"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btn_welcome_terminal"
+                android:layout_width="240dp"
+                android:layout_height="44dp"
+                android:backgroundTint="#2D2D30"
+                android:text="Open CLI Terminal"
+                android:textAllCaps="false"
+                android:textColor="#4FC1FF"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <!-- Editor Container (Initially Hidden) -->
@@ -161,16 +263,17 @@
             android:id="@+id/editor_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_below="@id/top_app_bar"
+            android:layout_above="@id/vsc_status_bar"
+            android:layout_below="@id/top_bar_divider"
             android:orientation="vertical"
             android:visibility="gone">
 
-            <!-- Tab Bar Container -->
+            <!-- VS Code Tab Bar -->
             <HorizontalScrollView
                 android:id="@+id/tab_scroll_view"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:background="@color/zc_bg_deep"
+                android:layout_height="38dp"
+                android:background="#252526"
                 android:scrollbars="none">
 
                 <LinearLayout
@@ -185,35 +288,36 @@
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
-                android:background="@color/zc_terminal_bg"
-                android:textColor="@color/zc_text_primary"
-                android:textColorHint="@color/zc_text_muted"
-                android:textSize="14sp"
+                android:background="#1E1E1E"
                 android:fontFamily="monospace"
                 android:gravity="top|start"
-                android:paddingTop="16dp"
-                android:paddingBottom="16dp"
-                android:paddingEnd="16dp"
-                android:scrollbars="vertical|horizontal"
+                android:hint="Type your code here..."
                 android:inputType="textMultiLine|textNoSuggestions|textVisiblePassword"
-                android:hint="Type your code here..." />
+                android:paddingTop="14dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="16dp"
+                android:scrollbars="vertical|horizontal"
+                android:textColor="#D4D4D4"
+                android:textColorHint="#666666"
+                android:textSize="14sp" />
         </LinearLayout>
 
-        <!-- Floating Terminal Button -->
+        <!-- Floating Quick Terminal Button -->
         <ImageButton
             android:id="@+id/btn_terminal_fab"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_alignParentBottom="true"
-            android:layout_alignParentStart="true"
-            android:layout_marginStart="24dp"
-            android:layout_marginBottom="24dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_above="@id/vsc_status_bar"
+            android:layout_alignParentEnd="true"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="16dp"
             android:background="@drawable/bg_fab_dark"
+            android:contentDescription="Open Terminal"
+            android:elevation="6dp"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
             android:src="@drawable/ic_terminal"
-            app:tint="@color/zc_text_white"
-            android:elevation="4dp" />
-
-
+            app:tint="#4FC1FF" />
 
     </RelativeLayout>
 

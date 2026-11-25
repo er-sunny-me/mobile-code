@@ -4,6 +4,10 @@
 
 # Built application files
 build/
+!app/src/main/java/com/termux/app/build/
+!app/src/main/java/com/termux/app/build/**
+!app/src/test/java/com/termux/app/build/
+!app/src/test/java/com/termux/app/build/**
 release/
 *.apk
 *.so

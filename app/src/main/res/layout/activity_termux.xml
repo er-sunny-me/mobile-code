@@ -22,160 +22,202 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="6.5"
-        android:orientation="vertical"
-        android:background="@color/zc_term_bg"
-        android:elevation="16dp">
+        android:background="#1E1E1E"
+        android:elevation="16dp"
+        android:orientation="vertical">
 
-        <!-- Top Tab Bar -->
+        <!-- VS Code-style Terminal Panel Header -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:background="@color/zc_term_tab_inactive"
+            android:background="#252526"
+            android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:gravity="bottom">
+            android:paddingHorizontal="8dp">
 
-            <!-- Terminal Tab (Active) -->
+            <!-- Active Terminal Tab -->
             <LinearLayout
                 android:id="@+id/tab_terminal"
                 android:layout_width="wrap_content"
-                android:layout_height="44dp"
-                android:background="@drawable/bg_term_tab_active"
-                android:orientation="horizontal"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/vsc_panel_tab_bg"
                 android:gravity="center_vertical"
-                android:paddingHorizontal="4dp">
-                <!-- Empty container to hold background, but no text/icon -->
+                android:orientation="horizontal"
+                android:paddingHorizontal="10dp">
+
+                <ImageView
+                    android:layout_width="15dp"
+                    android:layout_height="15dp"
+                    android:layout_marginEnd="5dp"
+                    android:src="@drawable/ic_terminal"
+                    app:tint="#007ACC" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CLI"
+                    android:textColor="#E0E0E0"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <Spinner
                 android:id="@+id/chat_provider_spinner"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_ai_spinner"
-                android:paddingHorizontal="12dp"
-                android:layout_marginEnd="8dp"
-                android:popupBackground="@color/zc_bg_dark"
+                android:paddingHorizontal="10dp"
+                android:popupBackground="#252526"
                 android:spinnerMode="dropdown" />
 
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
-            <!-- Sign-in Button: deterministic manual path for agent OAuth
-                 URLs (auto-open is best-effort; this always scans the full
-                 transcript and opens the sign-in link, or says why not).
-                 Dimmed until a scan spots an auth host in the output. -->
+            <!-- New Terminal Tab -->
             <ImageButton
-                android:id="@+id/btn_signin_terminal"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:alpha="0.45"
-                android:background="?selectableItemBackgroundBorderless"
-                android:contentDescription="Open sign-in link"
-                android:src="@drawable/ic_signin_lock"
-                app:tint="@color/zc_text_white" />
+                android:id="@+id/btn_new_session_terminal"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginHorizontal="1.5dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="New terminal tab"
+                android:padding="6.5dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_term_new"
+                app:tint="#CCCCCC" />
 
-            <!-- Pick Image Button -->
+            <!-- Toggle Soft Keyboard (helpful in TUIs like OpenCode) -->
+            <ImageButton
+                android:id="@+id/btn_keyboard_terminal"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginHorizontal="1.5dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Toggle keyboard"
+                android:padding="6.5dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_term_keyboard"
+                app:tint="#E0E0E0" />
+
+            <!-- Open Built-in WebView Browser -->
+            <ImageButton
+                android:id="@+id/btn_browser_terminal"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginHorizontal="1.5dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Open browser"
+                android:padding="6.5dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_browser_globe"
+                app:tint="#38BDF8" />
+
+            <!-- Attach Image -->
             <ImageButton
                 android:id="@+id/btn_pick_image"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_gallery"
-                app:tint="@color/zc_text_white" />
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginHorizontal="1.5dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Attach image"
+                android:padding="6.5dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_term_image"
+                app:tint="#4FC1FF" />
 
-
-            <!-- Full Screen Toggle Button -->
+            <!-- Toggle Fullscreen -->
             <ImageButton
                 android:id="@+id/btn_fullscreen_terminal"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_crop"
-                app:tint="@color/zc_text_gray" />
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginHorizontal="1.5dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Toggle fullscreen"
+                android:padding="6.5dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_term_fullscreen"
+                app:tint="#CCCCCC" />
 
-            <!-- Close Button -->
+            <!-- Close Terminal -->
             <ImageButton
                 android:id="@+id/btn_close_terminal"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_close_clear_cancel"
-                app:tint="@color/zc_text_gray" />
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="1.5dp"
+                android:background="@drawable/bg_term_action_btn"
+                android:contentDescription="Close terminal"
+                android:padding="6.5dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_term_close"
+                app:tint="#F48771" />
         </LinearLayout>
 
-        <!-- Divider -->
+        <!-- VS Code Accent Divider -->
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#333333" />
-
+            android:background="#007ACC" />
 
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <!-- Main Terminal View -->
             <androidx.drawerlayout.widget.DrawerLayout
                 android:id="@+id/drawer_layout"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent">
-                
-                <com.termux.view.TerminalView
-                    android:id="@+id/terminal_view"
+                <FrameLayout
                     android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <com.termux.view.TerminalView
+                        android:id="@+id/terminal_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:defaultFocusHighlightEnabled="false"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:padding="8dp"
+                        android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
+                        android:scrollbars="vertical"
+                        tools:ignore="UnusedAttribute" />
+
+                </FrameLayout>
+
+                <LinearLayout
+                    android:id="@+id/left_drawer"
+                    android:layout_width="240dp"
                     android:layout_height="match_parent"
-                    android:padding="8dp"
-                    android:defaultFocusHighlightEnabled="false"
-                    android:focusableInTouchMode="true"
-                    android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
-                    android:scrollbars="vertical"
-                    tools:ignore="UnusedAttribute" />
-                    
-            </FrameLayout>
+                    android:layout_gravity="start"
+                    android:background="?attr/termuxActivityDrawerBackground"
+                    android:choiceMode="singleChoice"
+                    android:descendantFocusability="blocksDescendants"
+                    android:divider="@android:color/transparent"
+                    android:dividerHeight="0dp"
+                    android:orientation="vertical">
 
-            <!-- Keeping Left Drawer for existing Termux functions but making it 0dp if not needed, 
-                 or leaving as is for users who swipe from left. -->
-            <LinearLayout
-                android:id="@+id/left_drawer"
-                android:layout_width="240dp"
-                android:layout_height="match_parent"
-                android:layout_gravity="start"
-                android:choiceMode="singleChoice"
-                android:divider="@android:color/transparent"
-                android:dividerHeight="0dp"
-                android:descendantFocusability="blocksDescendants"
-                android:orientation="vertical"
-                android:background="?attr/termuxActivityDrawerBackground">
-                <!-- File Explorer List -->
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/file_explorer_list"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp"
-                    android:clipToPadding="false" />
-            </LinearLayout>
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/file_explorer_list"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:clipToPadding="false"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp" />
+                </LinearLayout>
 
-        </androidx.drawerlayout.widget.DrawerLayout>
-
-
+            </androidx.drawerlayout.widget.DrawerLayout>
 
         </FrameLayout>
 
-        <!-- Extra Keys Toolbar (ViewPager from Termux) -->
+        <!-- Extra Keys Toolbar -->
         <androidx.viewpager.widget.ViewPager
             android:id="@+id/terminal_toolbar_view_pager"
             android:layout_width="match_parent"
             android:layout_height="34dp"
-            android:background="@color/zc_term_bg"
+            android:background="#252526"
             android:paddingHorizontal="4dp"
             android:paddingVertical="4dp" />
 

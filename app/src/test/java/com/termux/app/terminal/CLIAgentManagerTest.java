@@ -664,4 +664,53 @@ public class CLIAgentManagerTest {
         assertEquals(new HashSet<>(java.util.Arrays.asList(200, 201, 300, 400)), found);
         assertTrue(CLIAgentManager.collectDescendantPids(555, tree).isEmpty());
     }
+
+    @Test
+    public void antigravityEffortFlagMapsBudgetsWithoutUndefinedThinkingFlag() {
+        assertEquals(null, CLIAgentManager.antigravityEffortFlag(0));
+        assertEquals("low", CLIAgentManager.antigravityEffortFlag(2048));
+        assertEquals("medium", CLIAgentManager.antigravityEffortFlag(8192));
+        assertEquals("high", CLIAgentManager.antigravityEffortFlag(16384));
+        assertEquals("max", CLIAgentManager.antigravityEffortFlag(32000));
+    }
+
+    @Test
+    public void antigravityParsesAnsiBoxedAndMultiVendorLiveModels() {
+        String coloredOutput = "\u001B[1;36mAvailable models:\u001B[0m\n"
+                + "  \u001B[32m* gemini-3-pro (default)\u001B[0m\n"
+                + "  │ claude-sonnet-4-5\n"
+                + "  ✓ gpt-oss-120b\n"
+                + "  • Gemini 2.5 Flash (Low)\n";
+        java.util.List<String> parsed =
+                CLIAgentManager.parseModelsFromCliOutput("antigravity", coloredOutput);
+        assertTrue(parsed.contains("gemini-3-pro"));
+        assertTrue(parsed.contains("claude-sonnet-4-5"));
+        assertTrue(parsed.contains("gpt-oss-120b"));
+        assertTrue(parsed.contains("gemini-2.5-flash"));
+        assertEquals("gemini-3-pro",
+                CLIAgentManager.parseDefaultModelFromCliOutput("antigravity", coloredOutput));
+    }
+
+    @Test
+    public void cdWorkspaceShellFallsBackToProotSdcard() {
+        String cd = CLIAgentManager.cdWorkspaceShell("/storage/emulated/0/MyProject");
+        assertTrue(cd.contains("'/storage/emulated/0/MyProject'"));
+        assertTrue(cd.contains("'/mnt/sdcard/MyProject'"));
+        assertTrue(cd.contains("|| true"));
+    }
+
+    @Test
+    public void openCodeAttachSessionExtractionHandlesFlagForms() {
+        assertEquals("ses_123", CLIAgentManager.extractOpenCodeAttachSessionId(
+                "opencode\u0000attach\u0000http://127.0.0.1:4096\u0000--session\u0000ses_123\u0000"));
+        assertEquals("ses_456", CLIAgentManager.extractOpenCodeAttachSessionId(
+                "/root/.opencode/bin/opencode\u0000attach\u0000--session=ses_456\u0000"));
+        assertEquals("", CLIAgentManager.extractOpenCodeAttachSessionId(
+                "opencode\u0000attach\u0000http://127.0.0.1:4096\u0000"));
+        assertEquals(null, CLIAgentManager.extractOpenCodeAttachSessionId("opencode\u0000"));
+        assertEquals("ses_abc", CLIAgentManager.extractSessionFlagArg(
+                "cd '/proj' && opencode attach http://127.0.0.1:4096 --session ses_abc"));
+        assertEquals(null, CLIAgentManager.extractSessionFlagArg(
+                "opencode attach http://127.0.0.1:4096"));
+    }
 }

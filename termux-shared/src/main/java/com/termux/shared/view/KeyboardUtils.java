@@ -44,8 +44,20 @@ public class KeyboardUtils {
     public static void toggleSoftKeyboard(final Context context) {
         if (context == null) return;
         InputMethodManager inputMethodManager = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (inputMethodManager != null)
-            inputMethodManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+        if (inputMethodManager == null) return;
+        if (context instanceof Activity && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Activity activity = (Activity) context;
+            View currentFocus = activity.getCurrentFocus();
+            if (currentFocus != null) {
+                if (isSoftKeyboardVisible(activity)) {
+                    inputMethodManager.hideSoftInputFromWindow(currentFocus.getWindowToken(), 0);
+                } else {
+                    showSoftKeyboard(activity, currentFocus);
+                }
+                return;
+            }
+        }
+        inputMethodManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
     }
 
     /**
@@ -66,9 +78,21 @@ public class KeyboardUtils {
      */
     public static void showSoftKeyboard(final Context context, final View view) {
         if (context == null || view == null) return;
+        if (!view.hasFocus()) {
+            view.requestFocus();
+        }
         InputMethodManager inputMethodManager = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (inputMethodManager != null)
-            inputMethodManager.showSoftInput(view, 0);
+        if (inputMethodManager != null) {
+            boolean shown = inputMethodManager.showSoftInput(view, 0);
+            if (!shown) {
+                view.post(() -> {
+                    view.requestFocus();
+                    if (!inputMethodManager.showSoftInput(view, 0)) {
+                        inputMethodManager.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT);
+                    }
+                });
+            }
+        }
     }
 
     public static void hideSoftKeyboard(final Context context, final View view) {

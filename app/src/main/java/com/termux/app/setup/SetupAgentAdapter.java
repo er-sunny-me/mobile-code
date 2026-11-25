@@ -103,17 +103,20 @@ public class SetupAgentAdapter extends RecyclerView.Adapter<SetupAgentAdapter.Ho
             if (listener != null) listener.onToggled(row.agent, isChecked);
         });
         holder.itemView.setOnClickListener(v -> holder.checkbox.toggle());
-        holder.itemView.setAlpha(row.checked ? 1f : 0.55f);
+        holder.itemView.setAlpha(row.checked ? 1f : 0.85f);
 
         if (row.installed) {
             holder.state.setText("✓ READY");
-            holder.state.setTextColor(0xFF00E676);
+            holder.state.setTextColor(0xFF4ADE80);
+            holder.state.setBackgroundResource(R.drawable.bg_badge_installed);
         } else if (row.bundled) {
-            holder.state.setText("BUNDLED");
-            holder.state.setTextColor(0xFFFFC107);
+            holder.state.setText("OFFLINE");
+            holder.state.setTextColor(0xFFFBBF24);
+            holder.state.setBackgroundResource(R.drawable.bg_badge_missing);
         } else {
             holder.state.setText("ONLINE");
-            holder.state.setTextColor(0xFF888888);
+            holder.state.setTextColor(0xFF9CA3AF);
+            holder.state.setBackgroundResource(R.drawable.bg_badge_missing);
         }
     }
 

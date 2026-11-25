@@ -122,11 +122,11 @@
     <string name="title_activity_termux_settings">&TERMUX_APP_NAME; Settings</string>
 
     <!-- Termux App Preferences -->
-    <string name="termux_preferences_title">&TERMUX_APP_NAME;</string>
-    <string name="termux_preferences_summary">Preferences for &TERMUX_APP_NAME; app</string>
+    <string name="termux_preferences_title">Terminal &amp; Appearance</string>
+    <string name="termux_preferences_summary">Keyboard shortcuts, font behavior and terminal settings</string>
 
-    <string name="sync_workshop_title">Sync Workshop Files</string>
-    <string name="sync_workshop_summary">Sync your normal NOVUS IDE storage with Ubuntu CLI storage</string>
+    <string name="sync_workshop_title">Sync Workspace Files</string>
+    <string name="sync_workshop_summary">Sync workspace files between Xyz.IDE storage and Ubuntu CLI</string>
 
     <string name="setup_wizard_title">Run Setup Wizard</string>
     <string name="setup_wizard_summary">First-launch setup again: Linux system, tools and coding agents</string>

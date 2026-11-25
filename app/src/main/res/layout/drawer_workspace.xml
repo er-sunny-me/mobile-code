@@ -104,7 +104,8 @@
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
         <!-- File Explorer List -->
         <androidx.recyclerview.widget.RecyclerView
@@ -118,7 +119,20 @@
         <include layout="@layout/layout_git_workspace" />
 
     </FrameLayout>
-    
+
+    <!-- One-Tap Build & Install APK -->
+    <Button
+        android:id="@+id/btn_build_install_apk"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="#1E3A5F"
+        android:textColor="@color/zc_text_white"
+        android:text="Build &amp; Install APK"
+        android:padding="12dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:textAllCaps="false" />
+
     <!-- Bottom Action Button -->
     <Button
         android:id="@+id/btn_open_folder"
@@ -128,7 +142,9 @@
         android:textColor="@color/zc_text_white"
         android:text="Change Workspace Folder"
         android:padding="12dp"
-        android:layout_margin="16dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="16dp"
         android:textAllCaps="false" />
 
 </LinearLayout>

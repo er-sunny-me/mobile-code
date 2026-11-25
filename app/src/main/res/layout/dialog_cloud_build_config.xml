@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#121212"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:text="Cloud Provider"
+            android:textColor="#DDDDDD"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/spinner_cloud_provider"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginBottom="14dp"
+            android:background="@android:drawable/btn_dropdown"
+            android:backgroundTint="#2C2C2C" />
+
+        <!-- GitHub Actions fields -->
+        <LinearLayout
+            android:id="@+id/layout_github_fields"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="GitHub Repository (owner/repo)"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/et_gh_repo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:hint="username/my-android-app"
+                android:inputType="text"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#666666"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="GitHub Personal Access Token (repo + workflow)"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/et_gh_token"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:hint="ghp_..."
+                android:inputType="textPassword"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#666666"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Workflow File"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/et_gh_workflow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:hint="android-build.yml"
+                android:inputType="text"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#666666"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Branch"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/et_gh_branch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:hint="main"
+                android:inputType="text"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#666666"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_write_gh_workflow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:backgroundTint="#2C2C2C"
+                android:text="Generate android-build.yml in Workspace"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Custom Remote Builder fields -->
+        <LinearLayout
+            android:id="@+id/layout_remote_fields"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Remote Builder Endpoint URL (POST zip -> APK)"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/et_remote_url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:hint="https://builder.example.com/build"
+                android:inputType="textUri"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#666666"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Bearer Auth Token (Optional)"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/et_remote_token"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Optional token..."
+                android:inputType="textPassword"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#666666"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

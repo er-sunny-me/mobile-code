@@ -193,16 +193,20 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
 
             if (!urlSet.isEmpty()) {
                 String url = (String) urlSet.iterator().next();
-                ShareUtils.openUrl(mActivity, url);
+                openUrlSmart(url);
                 return;
             }
         }
 
-        if (!term.isMouseTrackingActive() && !e.isFromSource(InputDevice.SOURCE_MOUSE)) {
-            if (!KeyboardUtils.areDisableSoftKeyboardFlagsSet(mActivity))
+        // Allow touch taps to open the soft keyboard even when TUI apps like OpenCode
+        // have terminal mouse tracking active (touch click already gets forwarded in onUp).
+        if (!e.isFromSource(InputDevice.SOURCE_MOUSE)) {
+            if (!KeyboardUtils.areDisableSoftKeyboardFlagsSet(mActivity)) {
+                mActivity.getTerminalView().requestFocus();
                 KeyboardUtils.showSoftKeyboard(mActivity, mActivity.getTerminalView());
-            else
+            } else {
                 Logger.logVerbose(LOG_TAG, "Not showing soft keyboard onSingleTapUp since its disabled");
+            }
         }
     }
 
@@ -560,6 +564,7 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
             } else {
                 Logger.logVerbose(LOG_TAG, "Showing/Hiding soft keyboard on toggle");
                 KeyboardUtils.clearDisableSoftKeyboardFlags(mActivity);
+                mActivity.getTerminalView().requestFocus();
                 KeyboardUtils.toggleSoftKeyboard(mActivity);
             }
         }
@@ -718,12 +723,29 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
             lv.setOnItemLongClickListener((parent, view, position, id) -> {
                 dialog.dismiss();
                 String url = (String) urls[position];
-                ShareUtils.openUrl(mActivity, url);
+                openUrlSmart(url);
                 return true;
             });
         });
 
         dialog.show();
+    }
+
+    /**
+     * Open local dev-server URLs inside Xyz.IDE's built-in WebView browser while keeping
+     * OAuth logins and external sites on the system Chrome browser.
+     */
+    private void openUrlSmart(String url) {
+        if (url != null
+                && !AuthUrlOpener.isAuthUrl(url)
+                && com.termux.app.browser.BrowserAutomationConfig.isLocalDevUrl(url)) {
+            android.content.Intent intent = new android.content.Intent(
+                    mActivity, com.termux.app.browser.BrowserActivity.class);
+            intent.putExtra(com.termux.app.browser.BrowserActivity.EXTRA_URL, url);
+            mActivity.startActivity(intent);
+            return;
+        }
+        ShareUtils.openUrl(mActivity, url);
     }
 
     public void reportIssueFromTranscript() {

@@ -1,251 +1,262 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#000000"
-    android:fillViewport="true">
+    android:layout_height="wrap_content"
+    android:background="#0D0D10"
+    android:orientation="vertical"
+    android:paddingHorizontal="14dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="6dp">
 
-    <LinearLayout
+    <!-- Primary Agent Card -->
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_marginBottom="14dp"
+        app:cardBackgroundColor="#16161B"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp"
+        app:strokeColor="#2A2A32"
+        app:strokeWidth="1dp">
 
-        <!-- Header Card -->
-        <com.google.android.material.card.MaterialCardView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            app:cardBackgroundColor="#121212"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#222222"
-            app:strokeWidth="1dp">
+            android:orientation="vertical"
+            android:padding="16dp">
 
-            <LinearLayout
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                android:layout_marginBottom="4dp"
+                android:text="Primary AI Agent"
+                android:textColor="#F3F4F6"
+                android:textSize="17sp"
+                android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:text="Select AI Agent"
-                    android:textColor="#FFFFFF"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:text="Default agent launched automatically in Terminal."
+                android:textColor="#9CA3AF"
+                android:textSize="12.5sp" />
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:text="Choose the primary AI agent that will run when you open the terminal chat."
-                    android:textColor="#AAAAAA"
-                    android:textSize="14sp" />
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_settings_row"
+                android:paddingHorizontal="6dp">
 
                 <Spinner
                     android:id="@+id/spinner_ai_provider"
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:background="@android:drawable/btn_dropdown"
-                    android:backgroundTint="#2C2C2C"
-                    android:paddingEnd="12dp"
-                    android:paddingStart="12dp" />
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Anthropic Settings Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/anthropic_settings_container"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            android:visibility="gone"
-            app:cardBackgroundColor="#121212"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#222222"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                    android:layout_height="match_parent"
+                    android:background="@android:color/transparent"
+                    android:paddingEnd="32dp"
+                    android:paddingStart="8dp" />
 
                 <TextView
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:text="Custom Provider Settings"
-                    android:textColor="#FFFFFF"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:textColorHint="#777777"
-                    app:boxBackgroundColor="#1A1A1A"
-                    app:boxCornerRadiusBottomEnd="8dp"
-                    app:boxCornerRadiusBottomStart="8dp"
-                    app:boxCornerRadiusTopEnd="8dp"
-                    app:boxCornerRadiusTopStart="8dp"
-                    app:boxStrokeColor="#444444"
-                    app:hintTextColor="#03DAC5">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/et_anthropic_auth_token"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="Auth Token"
-                        android:inputType="textPassword"
-                        android:textColor="#FFFFFF"
-                        android:textSize="16sp" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:textColorHint="#777777"
-                    app:boxBackgroundColor="#1A1A1A"
-                    app:boxCornerRadiusBottomEnd="8dp"
-                    app:boxCornerRadiusBottomStart="8dp"
-                    app:boxCornerRadiusTopEnd="8dp"
-                    app:boxCornerRadiusTopStart="8dp"
-                    app:boxStrokeColor="#444444"
-                    app:hintTextColor="#03DAC5">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/et_anthropic_base_url"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="Base URL"
-                        android:textColor="#FFFFFF"
-                        android:textSize="16sp" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColorHint="#777777"
-                    app:boxBackgroundColor="#1A1A1A"
-                    app:boxCornerRadiusBottomEnd="8dp"
-                    app:boxCornerRadiusBottomStart="8dp"
-                    app:boxCornerRadiusTopEnd="8dp"
-                    app:boxCornerRadiusTopStart="8dp"
-                    app:boxStrokeColor="#444444"
-                    app:hintTextColor="#03DAC5">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/et_anthropic_model"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:hint="Model"
-                        android:textColor="#FFFFFF"
-                        android:textSize="16sp" />
-                </com.google.android.material.textfield.TextInputLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Custom Command Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/custom_command_container"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            android:visibility="gone"
-            app:cardBackgroundColor="#121212"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#222222"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:text="Custom Execution Command"
-                    android:textColor="#FFFFFF"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColorHint="#777777"
-                    app:boxBackgroundColor="#1A1A1A"
-                    app:boxCornerRadiusBottomEnd="8dp"
-                    app:boxCornerRadiusBottomStart="8dp"
-                    app:boxCornerRadiusTopEnd="8dp"
-                    app:boxCornerRadiusTopStart="8dp"
-                    app:boxStrokeColor="#444444"
-                    app:hintTextColor="#03DAC5">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/et_custom_command"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="monospace"
-                        android:hint="Enter CLI command..."
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp" />
-                </com.google.android.material.textfield.TextInputLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Toggle Agents Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            app:cardBackgroundColor="#121212"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#222222"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:text="Enable/Disable Agents"
-                    android:textColor="#FFFFFF"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:text="Turn off the agents you don't use to hide them from the dropdown list."
-                    android:textColor="#AAAAAA"
+                    android:layout_gravity="end|center_vertical"
+                    android:layout_marginEnd="10dp"
+                    android:text="▾"
+                    android:textColor="#9CA3AF"
                     android:textSize="14sp" />
+            </FrameLayout>
 
-                <LinearLayout
-                    android:id="@+id/agents_toggle_container"
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Custom Provider Settings Card -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/anthropic_settings_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="14dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="#16161B"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp"
+        app:strokeColor="#2A2A32"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:text="Custom Provider Settings"
+                android:textColor="#F3F4F6"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:textColorHint="#8E929B"
+                app:boxBackgroundColor="#1E1E24"
+                app:boxCornerRadiusBottomEnd="10dp"
+                app:boxCornerRadiusBottomStart="10dp"
+                app:boxCornerRadiusTopEnd="10dp"
+                app:boxCornerRadiusTopStart="10dp"
+                app:boxStrokeColor="#3A3A44"
+                app:hintTextColor="#38BDF8">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_anthropic_auth_token"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-    </LinearLayout>
-</ScrollView>
+                    android:hint="Auth Token"
+                    android:inputType="textPassword"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:textColorHint="#8E929B"
+                app:boxBackgroundColor="#1E1E24"
+                app:boxCornerRadiusBottomEnd="10dp"
+                app:boxCornerRadiusBottomStart="10dp"
+                app:boxCornerRadiusTopEnd="10dp"
+                app:boxCornerRadiusTopStart="10dp"
+                app:boxStrokeColor="#3A3A44"
+                app:hintTextColor="#38BDF8">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_anthropic_base_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Base URL"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColorHint="#8E929B"
+                app:boxBackgroundColor="#1E1E24"
+                app:boxCornerRadiusBottomEnd="10dp"
+                app:boxCornerRadiusBottomStart="10dp"
+                app:boxCornerRadiusTopEnd="10dp"
+                app:boxCornerRadiusTopStart="10dp"
+                app:boxStrokeColor="#3A3A44"
+                app:hintTextColor="#38BDF8">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_anthropic_model"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Model"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Custom Command Card -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/custom_command_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="14dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="#16161B"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp"
+        app:strokeColor="#2A2A32"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:text="Custom Execution Command"
+                android:textColor="#F3F4F6"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColorHint="#8E929B"
+                app:boxBackgroundColor="#1E1E24"
+                app:boxCornerRadiusBottomEnd="10dp"
+                app:boxCornerRadiusBottomStart="10dp"
+                app:boxCornerRadiusTopEnd="10dp"
+                app:boxCornerRadiusTopStart="10dp"
+                app:boxStrokeColor="#3A3A44"
+                app:hintTextColor="#38BDF8">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_custom_command"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:hint="Enter CLI command..."
+                    android:textColor="#FFFFFF"
+                    android:textSize="13.5sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- CLI Agents Manager Card -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        app:cardBackgroundColor="#16161B"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp"
+        app:strokeColor="#2A2A32"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="CLI Agents &amp; Extensions"
+                android:textColor="#F3F4F6"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:text="Install missing agents or toggle which ones appear in your selector."
+                android:textColor="#9CA3AF"
+                android:textSize="12.5sp" />
+
+            <LinearLayout
+                android:id="@+id/agents_toggle_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+</LinearLayout>
