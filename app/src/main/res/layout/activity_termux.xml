@@ -62,6 +62,20 @@
                 android:layout_height="0dp"
                 android:layout_weight="1" />
 
+            <!-- Sign-in Button: deterministic manual path for agent OAuth
+                 URLs (auto-open is best-effort; this always scans the full
+                 transcript and opens the sign-in link, or says why not).
+                 Dimmed until a scan spots an auth host in the output. -->
+            <ImageButton
+                android:id="@+id/btn_signin_terminal"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:alpha="0.45"
+                android:background="?selectableItemBackgroundBorderless"
+                android:contentDescription="Open sign-in link"
+                android:src="@drawable/ic_signin_lock"
+                app:tint="@color/zc_text_white" />
+
             <!-- Pick Image Button -->
             <ImageButton
                 android:id="@+id/btn_pick_image"

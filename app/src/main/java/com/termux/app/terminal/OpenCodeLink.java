@@ -84,6 +84,36 @@ public class OpenCodeLink {
 
         /** The link itself is unavailable (server would not start, HTTP dead). */
         void onUnavailable(String reason);
+
+        /**
+         * Messages that already exist in the shared session (e.g. written
+         * from the terminal TUI) and have not been shown in this chat yet.
+         * Delivered before a turn streams, and by
+         * {@link OpenCodeLink#primeSharedSession} when a chat opens, so
+         * the GUI shows the SAME conversation the CLI shows — adopting a
+         * session silently while the chat stays empty reads as "not
+         * synced", which is exactly what a phone test reported.
+         */
+        default void onHistory(List<HistoryMessage> messages) {
+        }
+    }
+
+    /** One message of a shared session's history (see {@link #parseSessionHistory}). */
+    public static class HistoryMessage {
+        public final String id;
+        /** "user" or "assistant". */
+        public final String role;
+        /** Concatenated text parts (may be empty when reasoning-only). */
+        public final String text;
+        /** Concatenated reasoning parts ("" when the message has none). */
+        public final String reasoning;
+
+        public HistoryMessage(String id, String role, String text, String reasoning) {
+            this.id = id;
+            this.role = role;
+            this.text = text == null ? "" : text;
+            this.reasoning = reasoning == null ? "" : reasoning;
+        }
     }
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -98,6 +128,24 @@ public class OpenCodeLink {
     private static String sessionId;
     private static String sessionWorkspace;
 
+    // ---- Adopted-history state (per OpenCodeLink instance = per chat) ----
+    /** Server message ids already delivered via {@link Listener#onHistory}. */
+    private final java.util.Set<String> historyShownIds = new java.util.HashSet<>();
+    /** Session the shown-id set belongs to; a different session resets it. */
+    private String historySessionId;
+
+    // ---- Thinking config override (reasoningEffort via serve config) ----
+    // For a model that defines no matching server variant, the picked
+    // thinking level is applied through the serve process's config
+    // instead: provider.<pid>.models.<mid>.options.reasoningEffort —
+    // a shape the official OpenCode config schema (opencode.ai/config.json,
+    // ProviderConfig) and the v1 models docs both define (model "options"
+    // is a free-form object passed to the provider on every request).
+    // configEffortModel is the full provider/model id, configEffort the
+    // effort word ("low"/"medium"/"high"); both null = no override.
+    private static String configEffortModel;
+    private static String configEffort;
+
     // ---- Current turn state ----
     private volatile boolean turnCancelled;
     private volatile HttpURLConnection activeSse;
@@ -111,7 +159,13 @@ public class OpenCodeLink {
         return serverUp;
     }
 
-    /** The shared OpenCode session id, if one has been created. */
+    /**
+     * The shared OpenCode session id, as maintained by the session
+     * resolver ({@link #resolveSessionLocked}) — refreshed on every GUI
+     * send and every chat-open prime, so a terminal opening afterwards
+     * attaches to the id the resolver currently considers THE session
+     * for the workspace, not a stale value from an earlier run.
+     */
     public static String getSessionId() {
         return sessionId;
     }
@@ -121,14 +175,129 @@ public class OpenCodeLink {
     // ==================================================================
 
     /**
+     * The {@code OPENCODE_CONFIG_CONTENT} JSON the server runs with:
+     * always {@code permission:"allow"}, plus — when a thinking level is
+     * being applied through the config route — the target model's
+     * {@code options.reasoningEffort}. Pure and unit-testable.
+     *
+     * @param fullModelId full {@code provider/model} id the effort applies
+     *                    to, or null for no override
+     * @param effort      "low" / "medium" / "high", or null for no override
+     */
+    static String buildConfigContent(String fullModelId, String effort) {
+        if (fullModelId == null || effort == null
+                || !fullModelId.contains("/")) {
+            return "{\"permission\":\"allow\"}";
+        }
+        int slash = fullModelId.indexOf('/');
+        String provider = fullModelId.substring(0, slash);
+        String model = fullModelId.substring(slash + 1);
+        return "{\"permission\":\"allow\",\"provider\":{"
+                + MiniJson.quote(provider)
+                + ":{\"models\":{"
+                + MiniJson.quote(model)
+                + ":{\"options\":{\"reasoningEffort\":"
+                + MiniJson.quote(effort)
+                + "}}}}}}";
+    }
+
+    /** The config content for the CURRENT override state. */
+    static synchronized String currentConfigContent() {
+        return buildConfigContent(configEffortModel, configEffort);
+    }
+
+    /** The full model id the config effort override targets, or null. */
+    public static synchronized String getConfigEffortModel() {
+        return configEffortModel;
+    }
+
+    /** The config effort override in force ("low"/"medium"/"high"), or null. */
+    public static synchronized String getConfigEffort() {
+        return configEffort;
+    }
+
+    /**
+     * Set (or clear) the config reasoning-effort override. When the
+     * override CHANGES while the app-owned server is running, the server
+     * is stopped so whichever flow comes next — a GUI send or the
+     * terminal's ensure-and-attach command, both of which bake in the
+     * current config — restarts it exactly once with the new config. A
+     * server started by the terminal shell is not ours to kill; the new
+     * override then applies at its next start.
+     *
+     * @return true when the override state changed
+     */
+    public static synchronized boolean applyConfigReasoningEffort(String fullModelId,
+                                                                  String effort) {
+        String newModel = effort == null ? null : fullModelId;
+        String newEffort = effort == null ? null : effort;
+        if (java.util.Objects.equals(configEffortModel, newModel)
+                && java.util.Objects.equals(configEffort, newEffort)) {
+            return false;
+        }
+        configEffortModel = newModel;
+        configEffort = newEffort;
+        if (serverProcess != null && serverProcess.isAlive()) {
+            // Restart-on-change: the running server still has the old
+            // config baked in. killServerLocked also drops the session
+            // handle; the session itself persists on disk server-side and
+            // is re-adopted on the next send.
+            killServerLocked();
+        }
+        return true;
+    }
+
+    /** Escape a string for embedding inside a double-quoted shell string. */
+    private static String escapeForDoubleQuotes(String s) {
+        return s.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("$", "\\$").replace("`", "\\`");
+    }
+
+    /**
      * The shell command that starts the shared server for {@code workspace}.
      * Pure string building (unit-testable); the caller wraps/runs it.
      */
     static String buildServeCommand(String workspace) {
         return "cd " + CLIAgentManager.singleQuote(workspace)
             + " && export PATH=\"$HOME/.opencode/bin:$PATH\""
-            + " && export OPENCODE_CONFIG_CONTENT=\"{\\\"permission\\\":\\\"allow\\\"}\""
+            + " && export OPENCODE_CONFIG_CONTENT=\""
+            + escapeForDoubleQuotes(currentConfigContent()) + "\""
             + " && exec opencode serve --hostname 127.0.0.1 --port " + PORT;
+    }
+
+    /**
+     * The terminal-side counterpart of the server start: a shell snippet
+     * that ensures the shared server is up (starting it with the CURRENT
+     * config when the port does not answer) and waits until it does. The
+     * terminal session already runs inside the workshop, so the serve
+     * invocation is the same one the app uses, minus the proot wrapping.
+     * The probe uses bash's /dev/tcp so it needs no curl/wget in the
+     * rootfs. Pure and unit-testable.
+     */
+    static String buildEnsureServerShell() {
+        String probe = "(exec 3<>/dev/tcp/127.0.0.1/" + PORT + ") 2>/dev/null";
+        return "if ! " + probe + "; then "
+                + "export OPENCODE_CONFIG_CONTENT='"
+                + currentConfigContent().replace("'", "'\\''") + "'; "
+                + "echo '[Xyz.IDE] Starting the shared OpenCode server…'; "
+                + "nohup opencode serve --hostname 127.0.0.1 --port " + PORT
+                + " >/dev/null 2>&1 & "
+                + "for i in $(seq 1 45); do " + probe + " && break; sleep 2; done; "
+                + "fi";
+    }
+
+    /**
+     * The full terminal command for OpenCode: ensure the shared server,
+     * then attach to it (with the GUI's session id when one exists, so
+     * the TUI lands in the same conversation). Used in BOTH open orders —
+     * GUI-first (server already up: the ensure is a no-op probe) and
+     * terminal-first (the ensure starts the server the GUI will later
+     * adopt sessions from).
+     */
+    static String buildTerminalCommand(String sessionId) {
+        return "export PATH=\"$HOME/.opencode/bin:$PATH\" && "
+                + buildEnsureServerShell()
+                + "; " + buildAttachCommand(sessionId);
     }
 
     /**
@@ -285,21 +454,156 @@ public class OpenCodeLink {
     // Session + turn
     // ==================================================================
 
-    private String ensureSessionLocked() throws Exception {
-        if (sessionId != null) {
-            try {
-                get("/session/" + sessionId);
-                return sessionId;
-            } catch (Exception e) {
-                sessionId = null; // stale (server restarted) — create fresh below
+    /**
+     * The session-resolution preference (pure): the SERVER's session list
+     * wins over the locally stored id. {@link #pickSessionToAdopt} picks
+     * the most recently updated session for the workspace (or the server's
+     * only session); only when the list has nothing adoptable does the
+     * stored id get used.
+     *
+     * <p>This ordering is the fix for a real sync break: the old code
+     * validated the stored id FIRST and returned it whenever it still
+     * existed. Once the GUI had created a session, that id stayed valid
+     * forever — so if the user then worked in the terminal, the TUI's
+     * (newer) session and the GUI's (older) session ran side by side and
+     * the two NEVER converged, no matter how often either side sent.</p>
+     */
+    static String chooseResolvedSessionId(String sessionsJson,
+                                          java.util.Set<String> acceptableDirs,
+                                          String storedId) {
+        String adopted = pickSessionToAdopt(sessionsJson, acceptableDirs);
+        if (adopted != null) return adopted;
+        return storedId;
+    }
+
+    /**
+     * Resolve THE shared session for {@code workspace}, in this order:
+     * (1) the server's own session list — most recently updated session
+     * for this workspace wins, whoever created it (GUI or TUI);
+     * (2) the stored id, when it still exists server-side;
+     * (3) a newly created session — only when {@code createIfMissing}
+     * (priming a chat must not mint empty sessions).
+     * Caller must hold the class lock.
+     */
+    private String resolveSessionLocked(String workspace, boolean createIfMissing) throws Exception {
+        String stored = sessionId;
+        String resolved = null;
+        try {
+            resolved = chooseResolvedSessionId(get("/session"),
+                    sessionDirectoryCandidates(workspace,
+                            TermuxConstants.TERMUX_HOME_DIR_PATH),
+                    stored);
+        } catch (Exception ignored) {
+            // Listing failed — fall back to validating the stored id.
+            resolved = stored;
+        }
+        if (resolved != null) {
+            if (resolved.equals(stored)) {
+                try {
+                    get("/session/" + resolved);
+                    sessionId = resolved;
+                    return resolved;
+                } catch (Exception e) {
+                    sessionId = null; // stale (server restarted) — fall through
+                }
+            } else {
+                // Adopted from the server list: it exists by construction.
+                sessionId = resolved;
+                return resolved;
             }
         }
+        if (!createIfMissing) return null;
         String resp = post("/session", "{}");
         Object parsed = MiniJson.parse(resp);
         String id = MiniJson.str(MiniJson.asMap(parsed), "id");
         if (id == null || id.isEmpty()) throw new Exception("Server did not return a session id");
         sessionId = id;
         return id;
+    }
+
+    /**
+     * The directory strings a session for {@code workspace} may carry
+     * server-side. The GUI names workspaces by their HOST path, but inside
+     * the workshop the same folder appears under proot-distro's bindings:
+     * shared storage is bound at {@code /mnt/sdcard} (a terminal TUI's cwd
+     * shows {@code /mnt/sdcard/13.11.2026} for the host folder
+     * {@code /storage/emulated/0/13.11.2026} — device-evidenced), and the
+     * Termux home is the rootfs {@code /root}. Pure and unit-testable.
+     */
+    static java.util.Set<String> sessionDirectoryCandidates(String workspace, String homePath) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        if (workspace == null) return out;
+        String w = workspace;
+        while (w.length() > 1 && w.endsWith("/")) w = w.substring(0, w.length() - 1);
+        out.add(w);
+        if (w.startsWith("/storage/emulated/0/")) {
+            out.add("/mnt/sdcard/" + w.substring("/storage/emulated/0/".length()));
+        } else if (w.equals("/storage/emulated/0")) {
+            out.add("/mnt/sdcard");
+        } else if (w.startsWith("/sdcard/")) {
+            out.add("/mnt/sdcard/" + w.substring("/sdcard/".length()));
+        } else if (w.equals("/sdcard")) {
+            out.add("/mnt/sdcard");
+        }
+        if (homePath != null && w.equals(homePath)) {
+            out.add("/root");
+        }
+        return out;
+    }
+
+    /**
+     * Pick the session to adopt from a {@code GET /session} response: the
+     * most recently updated session whose directory is one of
+     * {@code acceptableDirs}. When NO session matches the directory but
+     * the server holds exactly ONE session in total, that one is adopted
+     * — there is only one conversation in the world, so there is nothing
+     * it could be confused with (this covers binding-path spellings the
+     * candidate list did not foresee). Returns null when there is nothing
+     * safe to adopt and the caller must create a new session. Pure and
+     * unit-testable.
+     */
+    static String pickSessionToAdopt(String sessionsJson,
+                                     java.util.Set<String> acceptableDirs) {
+        if (sessionsJson == null) return null;
+        Object root;
+        try {
+            root = MiniJson.parse(sessionsJson);
+        } catch (Exception e) {
+            return null;
+        }
+        List<Object> sessions = MiniJson.asList(root);
+        if (sessions == null) {
+            // Defensive: some builds wrap lists in {"data": [...]}.
+            Map<String, Object> m = MiniJson.asMap(root);
+            if (m != null) sessions = MiniJson.asList(m.get("data"));
+        }
+        if (sessions == null || sessions.isEmpty()) return null;
+        String onlyId = null;
+        int total = 0;
+        String bestId = null;
+        long bestUpdated = Long.MIN_VALUE;
+        for (Object o : sessions) {
+            Map<String, Object> s = MiniJson.asMap(o);
+            if (s == null) continue;
+            String id = MiniJson.str(s, "id");
+            if (id == null || id.isEmpty()) continue;
+            total++;
+            onlyId = id;
+            String dir = MiniJson.str(s, "directory");
+            if (dir == null || acceptableDirs == null || !acceptableDirs.contains(dir)) continue;
+            long updated = 0;
+            Map<String, Object> time = MiniJson.asMap(s.get("time"));
+            if (time != null) {
+                Object u = time.get("updated");
+                if (u instanceof Number) updated = ((Number) u).longValue();
+            }
+            if (bestId == null || updated > bestUpdated) {
+                bestId = id;
+                bestUpdated = updated;
+            }
+        }
+        if (bestId != null) return bestId;
+        return total == 1 ? onlyId : null;
     }
 
     /**
@@ -327,45 +631,19 @@ public class OpenCodeLink {
         turnCancelled = false;
         new Thread(() -> {
             // 1) Server up? (restart when the workspace changed under it)
-            boolean workspaceChanged = serverWorkspace != null && !serverWorkspace.equals(workspace);
-            if (workspaceChanged || !healthyCached()) {
-                synchronized (OpenCodeLink.class) {
-                    if (workspaceChanged || serverProcess == null || !serverProcess.isAlive()) {
-                        if (!startServerLocked(workspace)) {
-                            main.post(() -> listener.onUnavailable(
-                                    "OpenCode server could not be started (bootstrap missing?)."));
-                            return;
-                        }
-                    }
-                }
-                long deadline = System.currentTimeMillis() + SERVER_START_TIMEOUT_MS;
-                boolean up = false;
-                while (System.currentTimeMillis() < deadline) {
-                    if (turnCancelled) return;
-                    if (probeHealthy()) {
-                        up = true;
-                        break;
-                    }
-                    if (serverProcess != null && !serverProcess.isAlive()) break;
-                    try {
-                        Thread.sleep(1500);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
-                }
-                if (!up) {
+            if (!ensureServerRunning(workspace)) {
+                if (!turnCancelled) {
                     main.post(() -> listener.onUnavailable(
-                            "OpenCode server did not come up in time."));
-                    return;
+                            "OpenCode server could not be started or did not come up in time."));
                 }
+                return;
             }
 
-            // 2) Shared session
+            // 2) THE shared session (server list wins over the stored id)
             final String sid;
             try {
                 synchronized (OpenCodeLink.class) {
-                    sid = ensureSessionLocked();
+                    sid = resolveSessionLocked(workspace, true);
                     sessionWorkspace = workspace;
                 }
             } catch (Exception e) {
@@ -375,9 +653,45 @@ public class OpenCodeLink {
             activeSessionId = sid;
             main.post(() -> listener.onLinked(sid));
 
-            // 3) Stream the turn
+            // 3) Show what is already in that session (e.g. written from
+            // the terminal) BEFORE this turn's prompt is posted, so the
+            // chat visibly holds the same conversation as the CLI.
+            emitHistory(sid, listener);
+
+            // 4) Stream the turn
             streamTurn(workspace, sid, prompt, modelId, variant, listener);
         }, "opencode-link").start();
+    }
+
+    /**
+     * Bring the shared server up for {@code workspace}: restart it when
+     * the workspace changed under it, start it when it is not running,
+     * and wait (up to {@link #SERVER_START_TIMEOUT_MS}) until it answers
+     * health checks. A server started by the TERMINAL's ensure step (not
+     * our child process) counts as up — the health probe does not care
+     * who spawned it. Runs on a background thread.
+     */
+    private boolean ensureServerRunning(String workspace) {
+        boolean workspaceChanged = serverWorkspace != null && !serverWorkspace.equals(workspace);
+        if (!workspaceChanged && healthyCached()) return true;
+        synchronized (OpenCodeLink.class) {
+            if (workspaceChanged || serverProcess == null || !serverProcess.isAlive()) {
+                if (!healthyCached() && !startServerLocked(workspace)) {
+                    return false;
+                }
+            }
+        }
+        long deadline = System.currentTimeMillis() + SERVER_START_TIMEOUT_MS;
+        while (System.currentTimeMillis() < deadline) {
+            if (turnCancelled) return false;
+            if (probeHealthy()) return true;
+            if (serverProcess != null && !serverProcess.isAlive()) {
+                // Our child died during startup and nothing else answers.
+                if (!probeHealthy()) return false;
+            }
+            sleepQuietly(1500);
+        }
+        return probeHealthy();
     }
 
     /**
@@ -795,6 +1109,154 @@ public class OpenCodeLink {
     }
 
     /**
+     * Parse a {@code GET /session/{id}/message} response into the FULL
+     * history: every message, in order, as {@link HistoryMessage}s —
+     * unlike {@link #parseSessionMessages}, which extracts only the last
+     * turn's reply for recovery. Messages without an id, without a
+     * recognised role, or with neither text nor reasoning content are
+     * skipped. Pure and unit-testable.
+     */
+    static List<HistoryMessage> parseSessionHistory(String json) {
+        List<HistoryMessage> out = new ArrayList<>();
+        if (json == null) return out;
+        Object root;
+        try {
+            root = MiniJson.parse(json);
+        } catch (Exception e) {
+            return out;
+        }
+        List<Object> messages = MiniJson.asList(root);
+        if (messages == null) return out;
+        for (Object o : messages) {
+            Map<String, Object> m = MiniJson.asMap(o);
+            if (m == null) continue;
+            Map<String, Object> info = MiniJson.asMap(m.get("info"));
+            if (info == null) continue;
+            String id = MiniJson.str(info, "id");
+            String role = MiniJson.str(info, "role");
+            if (id == null || id.isEmpty()) continue;
+            if (!"user".equals(role) && !"assistant".equals(role)) continue;
+            StringBuilder text = new StringBuilder();
+            StringBuilder reasoning = new StringBuilder();
+            List<Object> parts = MiniJson.asList(m.get("parts"));
+            if (parts != null) {
+                for (Object po : parts) {
+                    Map<String, Object> p = MiniJson.asMap(po);
+                    if (p == null) continue;
+                    String txt = MiniJson.str(p, "text");
+                    if (txt == null) continue;
+                    String type = MiniJson.str(p, "type");
+                    if ("text".equals(type)) {
+                        if (text.length() > 0) text.append('\n');
+                        text.append(txt);
+                    } else if ("reasoning".equals(type)) {
+                        if (reasoning.length() > 0) reasoning.append('\n');
+                        reasoning.append(txt);
+                    }
+                }
+            }
+            if (text.length() == 0 && reasoning.length() == 0) continue;
+            out.add(new HistoryMessage(id, role, text.toString(), reasoning.toString()));
+        }
+        return out;
+    }
+
+    /**
+     * A content key for a history message: role + normalised text. The
+     * GUI chat persists its own bubbles locally (without server ids), so
+     * when adopted history is rendered, a message the chat already shows
+     * is recognised by this key even though its server id is new to the
+     * chat instance. Reasoning is deliberately not part of the key — the
+     * same reply can carry its reasoning split differently.
+     */
+    public static String historyKey(HistoryMessage m) {
+        if (m == null) return "";
+        return m.role + "\n" + m.text.trim().replaceAll("\\s+", " ");
+    }
+
+    /**
+     * The subset of {@code all} that still needs rendering: drops
+     * messages whose server id was already delivered ({@code shownIds})
+     * and messages whose content key is already on screen
+     * ({@code renderedKeys} — e.g. restored from the chat's local store).
+     * Pure and unit-testable.
+     */
+    public static List<HistoryMessage> filterUnseenHistory(List<HistoryMessage> all,
+                                                    java.util.Set<String> shownIds,
+                                                    java.util.Set<String> renderedKeys) {
+        List<HistoryMessage> out = new ArrayList<>();
+        if (all == null) return out;
+        for (HistoryMessage m : all) {
+            if (m == null) continue;
+            if (shownIds != null && shownIds.contains(m.id)) continue;
+            if (renderedKeys != null && renderedKeys.contains(historyKey(m))) continue;
+            out.add(m);
+        }
+        return out;
+    }
+
+    /**
+     * Fetch the session's history and deliver the not-yet-shown part via
+     * {@link Listener#onHistory}. Runs on the caller's background thread.
+     * Delivered ids are remembered per link instance (and per session),
+     * so the same message is never delivered twice; the chat additionally
+     * dedupes by content key against its locally restored bubbles.
+     *
+     * @return true when at least one message was delivered
+     */
+    private boolean emitHistory(String sid, Listener listener) {
+        if (sid == null || listener == null) return false;
+        if (!sid.equals(historySessionId)) {
+            historySessionId = sid;
+            historyShownIds.clear();
+        }
+        List<HistoryMessage> all;
+        try {
+            all = parseSessionHistory(get("/session/" + sid + "/message"));
+        } catch (Exception e) {
+            return false;
+        }
+        List<HistoryMessage> unseen = filterUnseenHistory(all, historyShownIds, null);
+        if (unseen.isEmpty()) return false;
+        for (HistoryMessage m : unseen) historyShownIds.add(m.id);
+        final List<HistoryMessage> deliver = unseen;
+        main.post(() -> listener.onHistory(deliver));
+        return true;
+    }
+
+    /**
+     * Chat-open priming: bring the shared server up (starting it when
+     * needed, exactly like a send would), resolve the shared session —
+     * ADOPTING only, never creating — and deliver its existing history
+     * via {@link Listener#onHistory}. This is what makes opening the GUI
+     * after working in the terminal show the terminal's conversation,
+     * instead of an empty chat that merely claims to be linked.
+     * Fire-and-forget; failures are silent (a later send retries the
+     * whole chain and reports properly).
+     */
+    public void primeSharedSession(final String workspace, final Listener listener) {
+        if (listener == null) return;
+        new Thread(() -> {
+            // Priming is not a turn; a stale cancel flag from an aborted
+            // turn must not veto the server bring-up. (The activity only
+            // primes while no turn is in flight.)
+            turnCancelled = false;
+            if (!ensureServerRunning(workspace)) return;
+            final String sid;
+            try {
+                synchronized (OpenCodeLink.class) {
+                    sid = resolveSessionLocked(workspace, false);
+                    if (sid != null) sessionWorkspace = workspace;
+                }
+            } catch (Exception e) {
+                return;
+            }
+            if (sid == null) return;
+            emitHistory(sid, listener);
+        }, "opencode-prime").start();
+    }
+
+    /**
      * The JSON body for a prompt POST (shared by prompt_async and the sync
      * message endpoint). The {@code variant} field is the server API's
      * per-prompt reasoning-variant selector (SDK v2 SessionPromptAsyncData);
@@ -1026,7 +1488,7 @@ public class OpenCodeLink {
      *       (partial overlap while both are still streaming).</li>
      * </ul>
      */
-    static String stripReasoningFromText(String text, String reasoning) {
+    public static String stripReasoningFromText(String text, String reasoning) {
         if (text == null) return null;
         if (reasoning == null) return text;
         String r = reasoning.trim();
@@ -1489,6 +1951,23 @@ public class OpenCodeLink {
         else if (level.startsWith("Max")) name = "max";
         else return null; // Off / unrecognised
         return modelVariants.contains(name) ? name : null;
+    }
+
+    /**
+     * Map an app thinking level to the {@code reasoningEffort} word used
+     * by the config route (see {@link #buildConfigContent}). Unlike
+     * variant names — which are whatever the model defines, "max"
+     * included — reasoningEffort takes the provider's effort words, and
+     * the app's "Max (32k)" maps to the strongest standard word, "high".
+     * Returns null for Off / unrecognised levels (no override).
+     */
+    static String effortForLevel(String level) {
+        if (level == null) return null;
+        if (level.startsWith("Low")) return "low";
+        if (level.startsWith("Medium")) return "medium";
+        if (level.startsWith("High")) return "high";
+        if (level.startsWith("Max")) return "high";
+        return null; // Off / unrecognised
     }
 
     /**

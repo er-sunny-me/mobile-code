@@ -163,4 +163,72 @@ public class AuthUrlOpenerTest {
                 "Sign in: https://accounts.google.com/o/oauth2/auth?access_type=offline"
                         + "&client_id=1071006060591-x.apps.googleusercontent.com&prompt=consent"));
     }
+
+    // ---------------- Assessment (Sign-in button states) ----------------
+
+    @Test
+    public void assessCompleteWhenFullUrlPresent() {
+        AuthUrlOpener.AuthAssessment a = AuthUrlOpener.assessAuthText(agyOutput(FULL_OAUTH_URL));
+        assertEquals(AuthUrlOpener.AuthTextState.COMPLETE, a.state);
+        assertEquals(FULL_OAUTH_URL, a.url);
+    }
+
+    @Test
+    public void assessPartialWhenUrlStillPrinting() {
+        // Only the first half of the OAuth print has arrived: an auth
+        // candidate exists but fails the completeness gate.
+        String partial = "Your browser should open automatically. If not:\n"
+                + "https://accounts.google.com/o/oauth2/auth?access_type=offline"
+                + "&client_id=1071006060591-x.apps.googleusercontent.com";
+        AuthUrlOpener.AuthAssessment a = AuthUrlOpener.assessAuthText(partial);
+        assertEquals(AuthUrlOpener.AuthTextState.PARTIAL, a.state);
+        assertNull(a.url);
+    }
+
+    @Test
+    public void assessPartialOnBareAuthHostMention() {
+        // The host shows up (e.g. inside a sentence the CLI printed)
+        // without any extractable candidate: still PARTIAL, so the
+        // button reports "incomplete" instead of "nothing there".
+        AuthUrlOpener.AuthAssessment a = AuthUrlOpener.assessAuthText(
+                "Redirecting via accounts.google.com for sign-in…");
+        assertEquals(AuthUrlOpener.AuthTextState.PARTIAL, a.state);
+    }
+
+    @Test
+    public void assessNoneForOrdinaryOutput() {
+        assertEquals(AuthUrlOpener.AuthTextState.NONE,
+                AuthUrlOpener.assessAuthText("Build finished. See https://example.com/docs").state);
+        assertEquals(AuthUrlOpener.AuthTextState.NONE,
+                AuthUrlOpener.assessAuthText("").state);
+        assertEquals(AuthUrlOpener.AuthTextState.NONE,
+                AuthUrlOpener.assessAuthText(null).state);
+    }
+
+    @Test
+    public void authHostHintDetection() {
+        assertTrue(AuthUrlOpener.containsAuthHostHint("go to accounts.google.com now"));
+        assertTrue(AuthUrlOpener.containsAuthHostHint("open github.com/login/device please"));
+        assertTrue(AuthUrlOpener.containsAuthHostHint("auth.openai.com redirect"));
+        assertTrue(!AuthUrlOpener.containsAuthHostHint("just github.com and google.com links"));
+        assertTrue(!AuthUrlOpener.containsAuthHostHint(null));
+    }
+
+    @Test
+    public void findAuthUrlWorksBeyond12kOfFiller() {
+        // The manual Sign-in path scans the FULL transcript: a complete
+        // URL sitting behind more than the old 12000-char auto-scan tail
+        // must still be found by the opener itself (no internal cut).
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 400; i++) {
+            sb.append("workshop boot log line ").append(i)
+                    .append(" — installing packages, please wait…\n");
+        }
+        assertTrue(sb.length() > 12000);
+        sb.append("Your browser should open automatically. If not:\n")
+                .append(FULL_OAUTH_URL).append('\n');
+        assertEquals(FULL_OAUTH_URL, AuthUrlOpener.findAuthUrl(sb.toString()));
+        assertEquals(AuthUrlOpener.AuthTextState.COMPLETE,
+                AuthUrlOpener.assessAuthText(sb.toString()).state);
+    }
 }

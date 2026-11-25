@@ -624,6 +624,35 @@ public class CLIAgentManagerTest {
         assertFalse(parsed.contains("opencode.json"));
     }
 
+    // ---------------- Standalone OpenCode TUI detection ----------------
+
+    @Test
+    public void standaloneOpenCodeTuiIsDetected() {
+        // /proc cmdlines are NUL-separated; a bare `opencode` (optionally
+        // with flags) is a standalone TUI with its own private session.
+        assertTrue(CLIAgentManager.isStandaloneOpenCodeCmdline("opencode\u0000"));
+        assertTrue(CLIAgentManager.isStandaloneOpenCodeCmdline(
+                "/root/.opencode/bin/opencode\u0000--model\u0000opencode/big-pickle\u0000"));
+    }
+
+    @Test
+    public void attachedServedAndOneShotOpenCodeAreNotStandalone() {
+        assertFalse(CLIAgentManager.isStandaloneOpenCodeCmdline(
+                "opencode\u0000attach\u0000http://127.0.0.1:4096\u0000--session\u0000ses_1\u0000"));
+        assertFalse(CLIAgentManager.isStandaloneOpenCodeCmdline(
+                "opencode\u0000serve\u0000--hostname\u0000127.0.0.1\u0000--port\u00004096\u0000"));
+        assertFalse(CLIAgentManager.isStandaloneOpenCodeCmdline(
+                "opencode\u0000run\u0000hello\u0000"));
+    }
+
+    @Test
+    public void otherAgentsAndJunkAreNotStandaloneOpenCode() {
+        assertFalse(CLIAgentManager.isStandaloneOpenCodeCmdline("claude\u0000"));
+        assertFalse(CLIAgentManager.isStandaloneOpenCodeCmdline("bash\u0000-lc\u0000opencode\u0000"));
+        assertFalse(CLIAgentManager.isStandaloneOpenCodeCmdline(null));
+        assertFalse(CLIAgentManager.isStandaloneOpenCodeCmdline(""));
+    }
+
     @Test
     public void descendantCollectionWalksTheWholeTreeOnly() {
         java.util.Map<Integer, java.util.List<Integer>> tree = new java.util.HashMap<>();

@@ -272,6 +272,20 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (btnCloseTerminal != null) {
             btnCloseTerminal.setOnClickListener(v -> finish());
         }
+
+        // ZeroCode Studio: Sign-in Button — the deterministic manual path
+        // for agent OAuth URLs. Auto-open (transcript scans) is
+        // best-effort; this button always scans the full transcript of
+        // the current session and opens the sign-in link, or tells the
+        // user exactly why there is nothing to open yet.
+        View btnSignIn = findViewById(R.id.btn_signin_terminal);
+        if (btnSignIn != null) {
+            btnSignIn.setOnClickListener(v -> {
+                if (mTermuxTerminalSessionActivityClient != null) {
+                    mTermuxTerminalSessionActivityClient.onSignInButtonClicked();
+                }
+            });
+        }
         
         // ZeroCode Studio: Full Screen Terminal Button
         View btnFullscreenTerminal = findViewById(R.id.btn_fullscreen_terminal);
@@ -996,6 +1010,19 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     public boolean isVisible() {
         return mIsVisible;
+    }
+
+    /**
+     * Highlight (or dim) the top-bar 🔐 Sign-in button. Driven by the
+     * terminal auth scans: full opacity while an auth host is present in
+     * the recent output, dimmed otherwise. The button stays visible and
+     * tappable either way — tapping it always scans the full transcript.
+     */
+    public void setSignInButtonHighlighted(boolean highlighted) {
+        View btnSignIn = findViewById(R.id.btn_signin_terminal);
+        if (btnSignIn != null) {
+            btnSignIn.setAlpha(highlighted ? 1.0f : 0.45f);
+        }
     }
 
     public boolean isOnResumeAfterOnCreate() {

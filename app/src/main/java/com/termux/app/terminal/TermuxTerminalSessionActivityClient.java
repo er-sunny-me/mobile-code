@@ -79,6 +79,12 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         // a refresh of the displayed terminal.
         mActivity.getTerminalView().onScreenUpdated();
 
+        // Scan-on-display: whatever login screen is already rendered gets
+        // its auth-URL check now, even if it was printed while this
+        // activity was away (onTextChanged is visibility-gated, so those
+        // prints never triggered a scan).
+        scanCurrentSessionForAuthUrl();
+
         // The intent is now handled explicitly in TermuxActivity.onServiceConnected
         // and TermuxActivity.onNewIntent. We no longer process it here in onStart 
         // to avoid race conditions with session creation.
@@ -106,9 +112,23 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
                         : null;
                 if (runningAgentId != null) {
                     CLIAgentManager.CLIAgent running = CLIAgentManager.findAgent(runningAgentId);
-                    mActivity.showToast("⚡ " + (running != null ? running.name : "Agent")
-                            + " is already running in this terminal — not sending commands again",
-                            true);
+                    if ("opencode".equals(runningAgentId)
+                            && OpenCodeLink.isServerUp()
+                            && CLIAgentManager.isStandaloneOpenCodeTuiInSession(session.getPid())) {
+                        // A standalone TUI can never join the shared
+                        // session — say so plainly, with the way out,
+                        // instead of the generic "already running" line
+                        // that leaves the user assuming GUI↔CLI sync
+                        // that isn't happening.
+                        mActivity.showToast("⚡ This OpenCode window is a separate session — "
+                                + "it is NOT synced with the GUI chat. Close this TUI and reopen "
+                                + "the terminal to join the shared session.",
+                                true);
+                    } else {
+                        mActivity.showToast("⚡ " + (running != null ? running.name : "Agent")
+                                + " is already running in this terminal — not sending commands again",
+                                true);
+                    }
                 } else {
                     if (cwdToCd != null) {
                         session.write("cd \"" + cwdToCd + "\" && clear\n");
@@ -140,6 +160,12 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         // the first time bell key is pressed and play() is called, since sound may not be loaded
         // quickly enough before the call to play(). https://stackoverflow.com/questions/35435625
         loadBellSoundPool();
+
+        // A login screen may already be sitting fully rendered when the
+        // user returns to the terminal — no text change will ever fire for
+        // it, so scan what is on screen right now (see the auth-scan
+        // trigger notes at checkTerminalForAuthUrl).
+        scanCurrentSessionForAuthUrl();
     }
 
     /**
@@ -171,6 +197,25 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
     private long lastPopupTime = 0;
     private long lastAuthUrlCheckTime = 0;
 
+    // Trailing auth scan: the 2s throttle below is edge-triggered — when a
+    // login screen's final chunk lands INSIDE a throttle window, no scan
+    // ever runs on the settled screen, because a CLI waiting at an
+    // "Authorization code…" prompt produces no further output (exactly
+    // the static Antigravity screen X screenshotted: no browser, no
+    // toast). A throttled change therefore schedules ONE delayed re-scan.
+    private final android.os.Handler authScanHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private boolean authTrailingScanPending = false;
+    private final Runnable authTrailingScan = new Runnable() {
+        @Override
+        public void run() {
+            authTrailingScanPending = false;
+            lastAuthUrlCheckTime = System.currentTimeMillis();
+            TerminalSession current = mActivity.getCurrentSession();
+            if (current != null) checkTerminalForAuthUrl(current);
+        }
+    };
+
     @Override
     public void onTextChanged(@NonNull TerminalSession changedSession) {
         if (!mActivity.isVisible()) return;
@@ -186,8 +231,27 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
             if (now - lastAuthUrlCheckTime > 2000) { // Check every 2s max
                 lastAuthUrlCheckTime = now;
                 checkTerminalForAuthUrl(changedSession);
+            } else if (!authTrailingScanPending) {
+                // Throttled — but the settled text still gets scanned
+                // once, shortly after output stops.
+                authTrailingScanPending = true;
+                authScanHandler.postDelayed(authTrailingScan, 2200);
             }
         }
+    }
+
+    /**
+     * Scan whatever session is on screen right now for a sign-in URL.
+     * Called when the terminal is (re)displayed — activity start/resume —
+     * because a login screen printed earlier (or while the activity was
+     * away) produces no text-change event to trigger the scan. Bypasses
+     * the throttle on purpose: it IS the display event.
+     */
+    public void scanCurrentSessionForAuthUrl() {
+        TerminalSession current = mActivity.getCurrentSession();
+        if (current == null) return;
+        lastAuthUrlCheckTime = System.currentTimeMillis();
+        checkTerminalForAuthUrl(current);
     }
 
     /**
@@ -197,19 +261,81 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
      * in the browser, once per unique URL (see AuthUrlOpener). The
      * joined-lines transcript re-joins display-wrapped lines, so a wrapped
      * OAuth URL is seen whole.
+     *
+     * <p>Trigger set (a phone test showed text-change alone is not
+     * enough — the Antigravity login screen sat fully rendered and
+     * static, and nothing fired): text changes (2s throttle + one
+     * trailing re-scan), activity start/resume, and session switches —
+     * i.e. every moment the user can be LOOKING at the screen. The
+     * extraction itself was verified against the real emulator for
+     * main-screen, alt-screen and cursor-painted renderings
+     * (AuthUrlTerminalScanTest).</p>
      */
+    /**
+     * How much of the transcript tail the AUTO-scan looks at. This used
+     * to be 12000 chars — on a real device the login URL prints into a
+     * session that may already hold the workshop boot log, install
+     * output and earlier TUI frames, and a hard-wrapped URL whose first
+     * segment sat more than 12000 chars behind the end was severed
+     * before the detector ever saw it (the JVM tests all used short
+     * transcripts, so this never showed there). 60000 chars covers a
+     * full scrollback of login-relevant output while staying cheap at
+     * the scan's 2s throttle; the manual Sign-in button scans the FULL
+     * transcript with no cut at all.
+     */
+    private static final int AUTH_SCAN_TAIL_CHARS = 60000;
+
     private void checkTerminalForAuthUrl(TerminalSession session) {
         if (session.getEmulator() == null || session.getEmulator().getScreen() == null) return;
         String transcript = session.getEmulator().getScreen().getTranscriptTextWithFullLinesJoined();
         if (transcript == null || transcript.isEmpty()) return;
-        // Generous tail: a full OAuth URL is ~1.1k chars, and the detector
-        // must see its start even when a TUI screen of text follows it.
-        // (The detector itself now handles hard-wrapped prints and refuses
-        // partial URLs — see AuthUrlOpener.)
-        String tail = transcript.length() > 12000 ? transcript.substring(transcript.length() - 12000) : transcript;
+        String tail = transcript.length() > AUTH_SCAN_TAIL_CHARS
+                ? transcript.substring(transcript.length() - AUTH_SCAN_TAIL_CHARS) : transcript;
+        // Keep the Sign-in button's highlight honest on every scan: an
+        // auth host anywhere in the tail means a sign-in flow is around.
+        mActivity.runOnUiThread(() ->
+                mActivity.setSignInButtonHighlighted(AuthUrlOpener.containsAuthHostHint(tail)));
         if (AuthUrlOpener.findAuthUrl(tail) != null) {
             mActivity.runOnUiThread(() ->
                     AuthUrlOpener.openAuthUrlIfPresent(mActivity, tail, "agent"));
+        }
+    }
+
+    /** The FULL transcript of a session's screen — no tail cut. */
+    private static String fullTranscriptOf(TerminalSession session) {
+        if (session == null || session.getEmulator() == null
+                || session.getEmulator().getScreen() == null) return null;
+        return session.getEmulator().getScreen().getTranscriptTextWithFullLinesJoined();
+    }
+
+    /**
+     * The deterministic sign-in path: the user tapped the "🔐 Sign-in"
+     * button in the terminal's top bar. Scans the ENTIRE transcript of
+     * the current session (scrollback included, no tail cut) and opens
+     * the sign-in URL when a complete one is there — independent of the
+     * auto-scan's timing, throttles and visibility gates. When there is
+     * no complete link, the toast says which case it is: a link that is
+     * visibly still printing/incomplete, or no link on screen at all.
+     */
+    public void onSignInButtonClicked() {
+        TerminalSession current = mActivity.getCurrentSession();
+        String transcript = fullTranscriptOf(current);
+        if (transcript == null || transcript.isEmpty()) {
+            mActivity.showToast("No complete sign-in link on screen yet", true);
+            return;
+        }
+        AuthUrlOpener.AuthAssessment assessment =
+                AuthUrlOpener.openAuthUrlManually(mActivity, transcript, "agent");
+        switch (assessment.state) {
+            case COMPLETE:
+                break; // openAuthUrlManually already toasted why it opened
+            case PARTIAL:
+                mActivity.showToast("⏳ Sign-in link is still printing / incomplete"
+                        + " — wait a moment and tap 🔐 again", true);
+                break;
+            default:
+                mActivity.showToast("No complete sign-in link on screen yet", true);
+                break;
         }
     }
 
@@ -450,6 +576,12 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
             // notify about switched session if not already displaying the session
             notifyOfSessionChange();
         }
+
+        // Switching to a session displays whatever is already on its
+        // screen — including a login screen printed earlier, which never
+        // got an auth scan (text changes only scan the CURRENT session).
+        lastAuthUrlCheckTime = System.currentTimeMillis();
+        checkTerminalForAuthUrl(session);
 
         // We call the following even when the session is already being displayed since config may
         // be stale, like current session not selected or scrolled to.

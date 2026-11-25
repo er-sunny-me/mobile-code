@@ -462,6 +462,254 @@ public class OpenCodeLinkTest {
         assertNull(OpenCodeLink.parseSessionMessages(null));
     }
 
+    // ---------------- Config reasoning effort ----------------
+
+    @Test
+    public void configContentWithoutOverrideIsPermissionOnly() {
+        assertEquals("{\"permission\":\"allow\"}",
+                OpenCodeLink.buildConfigContent(null, null));
+        assertEquals("{\"permission\":\"allow\"}",
+                OpenCodeLink.buildConfigContent("opencode/big-pickle", null));
+        assertEquals("{\"permission\":\"allow\"}",
+                OpenCodeLink.buildConfigContent(null, "high"));
+        // A model id without a provider part cannot be aimed — no override.
+        assertEquals("{\"permission\":\"allow\"}",
+                OpenCodeLink.buildConfigContent("big-pickle", "high"));
+    }
+
+    @Test
+    public void configContentWritesReasoningEffortForProviderModel() {
+        // The exact shape the official config schema defines:
+        // provider.<pid>.models.<mid>.options.reasoningEffort.
+        assertEquals("{\"permission\":\"allow\",\"provider\":{\"opencode\":{\"models\":"
+                        + "{\"big-pickle\":{\"options\":{\"reasoningEffort\":\"high\"}}}}}}",
+                OpenCodeLink.buildConfigContent("opencode/big-pickle", "high"));
+        assertEquals("{\"permission\":\"allow\",\"provider\":{\"anthropic\":{\"models\":"
+                        + "{\"claude-sonnet-4-5\":{\"options\":{\"reasoningEffort\":\"low\"}}}}}}",
+                OpenCodeLink.buildConfigContent("anthropic/claude-sonnet-4-5", "low"));
+    }
+
+    @Test
+    public void effortForLevelMapsAppLevels() {
+        assertEquals("low", OpenCodeLink.effortForLevel("Low (2k)"));
+        assertEquals("medium", OpenCodeLink.effortForLevel("Medium (8k)"));
+        assertEquals("high", OpenCodeLink.effortForLevel("High (16k)"));
+        // Max has no stronger standard effort word — it maps to high.
+        assertEquals("high", OpenCodeLink.effortForLevel("Max (32k)"));
+        assertNull(OpenCodeLink.effortForLevel("Off"));
+        assertNull(OpenCodeLink.effortForLevel(null));
+    }
+
+    @Test
+    public void applyConfigOverrideTracksStateAndServeCommandCarriesIt() {
+        try {
+            assertTrue(OpenCodeLink.applyConfigReasoningEffort("opencode/big-pickle", "high"));
+            // Same state again — no change, no restart.
+            assertTrue(!OpenCodeLink.applyConfigReasoningEffort("opencode/big-pickle", "high"));
+            assertEquals("opencode/big-pickle", OpenCodeLink.getConfigEffortModel());
+            assertEquals("high", OpenCodeLink.getConfigEffort());
+            String cmd = OpenCodeLink.buildServeCommand("/root");
+            assertTrue(cmd.contains("reasoningEffort"));
+            assertTrue(cmd.contains("big-pickle"));
+        } finally {
+            OpenCodeLink.applyConfigReasoningEffort(null, null);
+        }
+        assertNull(OpenCodeLink.getConfigEffort());
+        assertEquals("{\"permission\":\"allow\"}", OpenCodeLink.currentConfigContent());
+    }
+
+    // ---------------- Terminal ensure + attach ----------------
+
+    @Test
+    public void terminalCommandEnsuresServerThenAttaches() {
+        String cmd = OpenCodeLink.buildTerminalCommand("ses_gui");
+        // Ensure step: port probe + same serve invocation, started only
+        // when the port does not answer.
+        assertTrue(cmd.contains("/dev/tcp/127.0.0.1/4096"));
+        assertTrue(cmd.contains("opencode serve --hostname 127.0.0.1 --port 4096"));
+        assertTrue(cmd.contains("OPENCODE_CONFIG_CONTENT"));
+        // Then attach, naming the shared session.
+        assertTrue(cmd.contains("opencode attach http://127.0.0.1:4096"));
+        assertTrue(cmd.contains("--session ses_gui"));
+        assertTrue(cmd.indexOf("opencode serve") < cmd.indexOf("opencode attach"));
+    }
+
+    @Test
+    public void terminalCommandWithoutSessionOmitsSessionFlag() {
+        String cmd = OpenCodeLink.buildTerminalCommand(null);
+        assertTrue(cmd.contains("opencode attach http://127.0.0.1:4096"));
+        assertTrue(!cmd.contains("--session"));
+    }
+
+    // ---------------- Session adoption ----------------
+
+    @Test
+    public void directoryCandidatesMapHostPathsToWorkshopPaths() {
+        java.util.Set<String> c = OpenCodeLink.sessionDirectoryCandidates(
+                "/storage/emulated/0/13.11.2026", "/data/data/com.xyzide/files/home");
+        assertTrue(c.contains("/storage/emulated/0/13.11.2026"));
+        // Device-evidenced binding: shared storage appears at /mnt/sdcard.
+        assertTrue(c.contains("/mnt/sdcard/13.11.2026"));
+
+        java.util.Set<String> home = OpenCodeLink.sessionDirectoryCandidates(
+                "/data/data/com.xyzide/files/home", "/data/data/com.xyzide/files/home");
+        assertTrue(home.contains("/root"));
+    }
+
+    @Test
+    public void adoptionPicksMostRecentlyUpdatedSessionForWorkspace() {
+        String json = "["
+                + "{\"id\":\"ses_old\",\"directory\":\"/mnt/sdcard/proj\",\"time\":{\"updated\":100}},"
+                + "{\"id\":\"ses_new\",\"directory\":\"/mnt/sdcard/proj\",\"time\":{\"updated\":300}},"
+                + "{\"id\":\"ses_elsewhere\",\"directory\":\"/other\",\"time\":{\"updated\":999}}"
+                + "]";
+        java.util.Set<String> dirs = OpenCodeLink.sessionDirectoryCandidates(
+                "/storage/emulated/0/proj", "/home");
+        assertEquals("ses_new", OpenCodeLink.pickSessionToAdopt(json, dirs));
+    }
+
+    @Test
+    public void adoptionFallsBackToTheOnlySession() {
+        // One session in the world, directory spelled in a way the
+        // candidates did not foresee — still unambiguous, adopt it.
+        String json = "[{\"id\":\"ses_only\",\"directory\":\"/weird/path\",\"time\":{\"updated\":5}}]";
+        assertEquals("ses_only", OpenCodeLink.pickSessionToAdopt(json,
+                OpenCodeLink.sessionDirectoryCandidates("/storage/emulated/0/proj", "/home")));
+    }
+
+    @Test
+    public void adoptionRefusesAmbiguousOrEmptyLists() {
+        String json = "["
+                + "{\"id\":\"ses_a\",\"directory\":\"/x\",\"time\":{\"updated\":1}},"
+                + "{\"id\":\"ses_b\",\"directory\":\"/y\",\"time\":{\"updated\":2}}"
+                + "]";
+        assertNull(OpenCodeLink.pickSessionToAdopt(json,
+                OpenCodeLink.sessionDirectoryCandidates("/storage/emulated/0/proj", "/home")));
+        assertNull(OpenCodeLink.pickSessionToAdopt("[]", java.util.Collections.emptySet()));
+        assertNull(OpenCodeLink.pickSessionToAdopt(null, java.util.Collections.emptySet()));
+        assertNull(OpenCodeLink.pickSessionToAdopt("not json", java.util.Collections.emptySet()));
+    }
+
+    @Test
+    public void adoptionHandlesDataWrappedList() {
+        String json = "{\"data\":[{\"id\":\"ses_w\",\"directory\":\"/root\",\"time\":{\"updated\":7}}]}";
+        java.util.Set<String> dirs = OpenCodeLink.sessionDirectoryCandidates("/home", "/home");
+        dirs.add("/root");
+        assertEquals("ses_w", OpenCodeLink.pickSessionToAdopt(json, dirs));
+    }
+
+    // ---------------- Session resolution preference ----------------
+
+    @Test
+    public void resolverPrefersNewerServerSessionOverStoredId() {
+        // The sync bug: the GUI stored ses_gui long ago; the user then
+        // worked in the terminal, whose session is NEWER. Resolution must
+        // pick the server's most recent workspace session, NOT the still-
+        // valid stored id — otherwise the two never converge.
+        String json = "["
+                + "{\"id\":\"ses_gui\",\"directory\":\"/mnt/sdcard/proj\",\"time\":{\"updated\":100}},"
+                + "{\"id\":\"ses_tui\",\"directory\":\"/mnt/sdcard/proj\",\"time\":{\"updated\":200}}"
+                + "]";
+        java.util.Set<String> dirs =
+                OpenCodeLink.sessionDirectoryCandidates("/storage/emulated/0/proj", "/home");
+        assertEquals("ses_tui", OpenCodeLink.chooseResolvedSessionId(json, dirs, "ses_gui"));
+    }
+
+    @Test
+    public void resolverKeepsStoredIdWhenServerListHasNoMatch() {
+        // Several sessions, none for this workspace, and more than one in
+        // total (so the single-session adoption fallback must not fire):
+        // the stored id is the only sane answer.
+        String json = "["
+                + "{\"id\":\"ses_a\",\"directory\":\"/x\",\"time\":{\"updated\":300}},"
+                + "{\"id\":\"ses_b\",\"directory\":\"/y\",\"time\":{\"updated\":400}}"
+                + "]";
+        java.util.Set<String> dirs =
+                OpenCodeLink.sessionDirectoryCandidates("/storage/emulated/0/proj", "/home");
+        assertEquals("ses_gui", OpenCodeLink.chooseResolvedSessionId(json, dirs, "ses_gui"));
+        assertNull(OpenCodeLink.chooseResolvedSessionId(json, dirs, null));
+        assertNull(OpenCodeLink.chooseResolvedSessionId("[]", dirs, null));
+    }
+
+    @Test
+    public void resolverAdoptsTheOnlySessionEvenIfStoredDiffers() {
+        String json = "[{\"id\":\"ses_only\",\"directory\":\"/weird\",\"time\":{\"updated\":5}}]";
+        java.util.Set<String> dirs =
+                OpenCodeLink.sessionDirectoryCandidates("/storage/emulated/0/proj", "/home");
+        assertEquals("ses_only", OpenCodeLink.chooseResolvedSessionId(json, dirs, "ses_gui"));
+    }
+
+    // ---------------- Session history ----------------
+
+    private static String historyJson() {
+        return "["
+                + "{\"info\":{\"id\":\"msg_1\",\"role\":\"user\"},\"parts\":["
+                + "{\"id\":\"p1\",\"type\":\"text\",\"text\":\"Build me a site\"}]},"
+                + "{\"info\":{\"id\":\"msg_2\",\"role\":\"assistant\"},\"parts\":["
+                + "{\"id\":\"p2\",\"type\":\"reasoning\",\"text\":\"Let me think\"},"
+                + "{\"id\":\"p3\",\"type\":\"text\",\"text\":\"Done — index.html created\"},"
+                + "{\"id\":\"p4\",\"type\":\"tool\",\"tool\":\"write\",\"state\":{\"status\":\"completed\"}}]},"
+                + "{\"info\":{\"id\":\"msg_3\",\"role\":\"user\"},\"parts\":["
+                + "{\"id\":\"p5\",\"type\":\"text\",\"text\":\"Now make it red\"}]},"
+                + "{\"info\":{\"role\":\"assistant\"},\"parts\":["
+                + "{\"id\":\"p6\",\"type\":\"text\",\"text\":\"id-less, must be skipped\"}]},"
+                + "{\"info\":{\"id\":\"msg_4\",\"role\":\"assistant\"},\"parts\":["
+                + "{\"id\":\"p7\",\"type\":\"step-start\"}]}"
+                + "]";
+    }
+
+    @Test
+    public void parseSessionHistoryExtractsAllMessagesInOrder() {
+        java.util.List<OpenCodeLink.HistoryMessage> history =
+                OpenCodeLink.parseSessionHistory(historyJson());
+        // msg_4 has neither text nor reasoning (step part only) and the
+        // id-less message is skipped: 3 messages remain, in order.
+        assertEquals(3, history.size());
+        assertEquals("msg_1", history.get(0).id);
+        assertEquals("user", history.get(0).role);
+        assertEquals("Build me a site", history.get(0).text);
+        assertEquals("", history.get(0).reasoning);
+        assertEquals("msg_2", history.get(1).id);
+        assertEquals("assistant", history.get(1).role);
+        assertEquals("Done — index.html created", history.get(1).text);
+        assertEquals("Let me think", history.get(1).reasoning);
+        assertEquals("msg_3", history.get(2).id);
+        assertEquals("user", history.get(2).role);
+    }
+
+    @Test
+    public void parseSessionHistoryToleratesGarbage() {
+        assertTrue(OpenCodeLink.parseSessionHistory(null).isEmpty());
+        assertTrue(OpenCodeLink.parseSessionHistory("not json").isEmpty());
+        assertTrue(OpenCodeLink.parseSessionHistory("{}").isEmpty());
+    }
+
+    @Test
+    public void filterUnseenHistoryDedupesByIdAndRenderedKey() {
+        java.util.List<OpenCodeLink.HistoryMessage> all =
+                OpenCodeLink.parseSessionHistory(historyJson());
+        // msg_1 already delivered by id; msg_2's content is already on
+        // screen (restored from the chat's local store, keyed by content).
+        java.util.Set<String> shownIds = new java.util.HashSet<>(java.util.Collections.singleton("msg_1"));
+        java.util.Set<String> renderedKeys = new java.util.HashSet<>(
+                java.util.Collections.singleton(OpenCodeLink.historyKey(all.get(1))));
+        java.util.List<OpenCodeLink.HistoryMessage> unseen =
+                OpenCodeLink.filterUnseenHistory(all, shownIds, renderedKeys);
+        assertEquals(1, unseen.size());
+        assertEquals("msg_3", unseen.get(0).id);
+        // Nothing filtered when both sets are empty/null.
+        assertEquals(3, OpenCodeLink.filterUnseenHistory(all, null, null).size());
+    }
+
+    @Test
+    public void historyKeyNormalisesWhitespace() {
+        OpenCodeLink.HistoryMessage a =
+                new OpenCodeLink.HistoryMessage("x", "user", "hello   world\nagain", "");
+        OpenCodeLink.HistoryMessage b =
+                new OpenCodeLink.HistoryMessage("y", "user", "hello world again", "");
+        assertEquals(OpenCodeLink.historyKey(a), OpenCodeLink.historyKey(b));
+    }
+
     // ---------------- MiniJson ----------------
 
     @Test

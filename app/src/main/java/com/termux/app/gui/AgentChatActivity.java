@@ -89,6 +89,15 @@ public class AgentChatActivity extends AppCompatActivity {
     private long lastSentPromptMs;
     private static final long DUPLICATE_SEND_WINDOW_MS = 30_000;
 
+    // Sign-in button (deterministic login path): the GUI's accumulated
+    // agent output, kept whole-run (bounded) so the 🔐 button can scan it
+    // on tap — the per-run scan buffer alone resets between runs, and the
+    // auto-open it feeds is best-effort. Guarded by its own lock: runner
+    // callbacks arrive off the main thread.
+    private final StringBuilder guiOutputBuffer = new StringBuilder();
+    private volatile String lastLinkedSnapshot = "";
+    private View btnChatSignIn;
+
     private RecyclerView recyclerView;
     private Spinner agentSpinner;
     private EditText promptInput;
@@ -222,6 +231,10 @@ public class AgentChatActivity extends AppCompatActivity {
         findViewById(R.id.btn_chat_dashboard).setOnClickListener(v ->
                 startActivity(new Intent(this, AgentDashboardActivity.class)));
         findViewById(R.id.btn_chat_terminal).setOnClickListener(v -> openInTerminal(null));
+        btnChatSignIn = findViewById(R.id.btn_chat_signin);
+        if (btnChatSignIn != null) {
+            btnChatSignIn.setOnClickListener(v -> onChatSignInClicked());
+        }
 
         scrollAttachments = findViewById(R.id.scroll_attachments);
         containerAttachments = findViewById(R.id.container_attachments);
@@ -303,6 +316,11 @@ public class AgentChatActivity extends AppCompatActivity {
         super.onResume();
         // The dashboard may have changed which agents are enabled / installed.
         setupAgentSpinner();
+        // Returning to the chat: if the shared OpenCode session has
+        // messages this chat has not shown (e.g. written from the
+        // terminal meanwhile), surface them — the GUI must SHOW the same
+        // conversation as the CLI, not just claim to share it.
+        maybePrimeOpenCodeLink();
     }
 
     @Override
@@ -427,6 +445,7 @@ public class AgentChatActivity extends AppCompatActivity {
                 updateModelAndThinkingChips();
                 agentManager.queryLiveModelsAsync(agent, liveModels -> updateModelAndThinkingChips());
                 agentManager.refreshRealModelAsync(agent, realModel -> updateModelAndThinkingChips());
+                maybePrimeOpenCodeLink();
             }
 
             @Override
@@ -830,6 +849,13 @@ public class AgentChatActivity extends AppCompatActivity {
                 // leaving the user to copy a wrapped URL by hand. Scan the
                 // accumulated output, not just this line — the detector
                 // re-joins hard-wrapped segments and refuses partial URLs.
+                synchronized (guiOutputBuffer) {
+                    guiOutputBuffer.append(line).append('\n');
+                    if (guiOutputBuffer.length() > 120000) {
+                        guiOutputBuffer.delete(0, guiOutputBuffer.length() - 120000);
+                    }
+                }
+                updateSignInHighlight();
                 authScanBuffer.append(line).append('\n');
                 if (authScanBuffer.length() > 12000) {
                     authScanBuffer.delete(0, authScanBuffer.length() - 12000);
@@ -1011,6 +1037,151 @@ public class AgentChatActivity extends AppCompatActivity {
     }
 
     /**
+     * Chat-open / agent-switch priming for the OpenCode link: resolve the
+     * shared session and render whatever it already contains that this
+     * chat has not shown. No-op for other agents and while a turn runs
+     * (the turn path renders history itself before streaming).
+     */
+    private void maybePrimeOpenCodeLink() {
+        CLIAgentManager.CLIAgent agent = selectedAgent();
+        if (agent == null || !agent.id.equals("opencode")) return;
+        if (linkTurnActive || (runner != null && runner.isRunning())) return;
+        openCodeLink.primeSharedSession(workspace(), new OpenCodeLink.Listener() {
+            @Override public void onLinked(String sessionId) { }
+            @Override public void onText(String snapshot) { }
+            @Override public void onReasoning(String snapshot) { }
+            @Override public void onTool(String label) { }
+            @Override public void onFinished(String error) { }
+            @Override public void onUnavailable(String reason) { }
+
+            @Override
+            public void onHistory(List<OpenCodeLink.HistoryMessage> messages) {
+                if (isFinishing() || isDestroyed()) return;
+                CLIAgentManager.CLIAgent cur = selectedAgent();
+                if (cur != null && cur.id.equals("opencode")) {
+                    renderSharedHistory(cur, messages);
+                }
+            }
+        });
+    }
+
+    /**
+     * Render adopted shared-session history into the chat: a status line
+     * saying where these came from, then the messages themselves (user
+     * bubbles, Thought Process for reasoning, agent bubbles with the
+     * reasoning overlap stripped — same shapes as live turns). Messages
+     * the chat already shows — including ones restored from the local
+     * session store, which carries no server ids — are recognised by
+     * content key and skipped, so nothing renders twice.
+     */
+    private void renderSharedHistory(CLIAgentManager.CLIAgent agent,
+                                     List<OpenCodeLink.HistoryMessage> messages) {
+        if (agent == null || messages == null || messages.isEmpty()) return;
+        java.util.Set<String> renderedKeys = new java.util.HashSet<>();
+        for (ChatMessage m : adapter.getMessages()) {
+            if (m.type == ChatMessage.Type.USER) {
+                renderedKeys.add(OpenCodeLink.historyKey(
+                        new OpenCodeLink.HistoryMessage("", "user", m.text, "")));
+            } else if (m.type == ChatMessage.Type.AGENT) {
+                renderedKeys.add(OpenCodeLink.historyKey(
+                        new OpenCodeLink.HistoryMessage("", "assistant", m.text, "")));
+            }
+        }
+        List<OpenCodeLink.HistoryMessage> unseen =
+                OpenCodeLink.filterUnseenHistory(messages, null, renderedKeys);
+        if (unseen.isEmpty()) return;
+        adapter.add(new ChatMessage(ChatMessage.Type.STATUS,
+                "🔗 Synced " + unseen.size() + " message(s) from the shared session"
+                        + " — this is the same conversation as the terminal."));
+        for (OpenCodeLink.HistoryMessage hm : unseen) {
+            if ("user".equals(hm.role)) {
+                adapter.add(new ChatMessage(ChatMessage.Type.USER, hm.text));
+            } else {
+                if (!hm.reasoning.isEmpty()) {
+                    adapter.add(new ChatMessage(ChatMessage.Type.THINKING,
+                            hm.reasoning, agent.name, agent.iconEmoji));
+                }
+                String display = OpenCodeLink.stripReasoningFromText(hm.text, hm.reasoning);
+                if (display != null && !display.trim().isEmpty()) {
+                    adapter.add(new ChatMessage(ChatMessage.Type.AGENT,
+                            display, agent.name, agent.iconEmoji));
+                }
+            }
+        }
+        if (currentSession != null) {
+            currentSession.messages.clear();
+            currentSession.messages.addAll(adapter.getMessages());
+            sessionManager.saveSession(currentSession);
+        }
+        scrollToBottom();
+    }
+
+    /**
+     * The text the 🔐 Sign-in button scans: everything the GUI has shown
+     * or received — the visible bubbles (bounded tail), the accumulated
+     * run output, and the latest linked-session snapshot.
+     */
+    private String buildSignInScanText() {
+        StringBuilder sb = new StringBuilder();
+        List<ChatMessage> shown = adapter.getMessages();
+        int budget = 60000;
+        for (int i = shown.size() - 1; i >= 0 && budget > 0; i--) {
+            String t = shown.get(i).text;
+            if (t == null) continue;
+            budget -= t.length() + 1;
+            sb.insert(0, t + "\n");
+        }
+        synchronized (guiOutputBuffer) {
+            sb.append(guiOutputBuffer);
+        }
+        sb.append('\n').append(lastLinkedSnapshot);
+        return sb.toString();
+    }
+
+    /**
+     * The deterministic sign-in path for the chat: the user tapped 🔐.
+     * Scans the GUI's accumulated output and opens the sign-in link when
+     * a complete one is there (even if auto-open already fired once —
+     * an explicit tap is a new instruction); otherwise the toast says
+     * which case it is — still printing/incomplete, or nothing there.
+     */
+    private void onChatSignInClicked() {
+        CLIAgentManager.CLIAgent agent = selectedAgent();
+        AuthUrlOpener.AuthAssessment assessment = AuthUrlOpener.openAuthUrlManually(
+                this, buildSignInScanText(), agent == null ? "agent" : agent.name);
+        switch (assessment.state) {
+            case COMPLETE:
+                break; // openAuthUrlManually already toasted why it opened
+            case PARTIAL:
+                Toast.makeText(this, "⏳ Sign-in link is still printing / incomplete"
+                        + " — wait a moment and tap 🔐 again", Toast.LENGTH_LONG).show();
+                break;
+            default:
+                Toast.makeText(this, "No complete sign-in link in the chat yet",
+                        Toast.LENGTH_LONG).show();
+                break;
+        }
+    }
+
+    /**
+     * Keep the 🔐 button's highlight honest: full opacity while an auth
+     * host appears in the recent GUI output, dimmed otherwise. Cheap
+     * substring checks only; safe to call from runner threads.
+     */
+    private void updateSignInHighlight() {
+        if (btnChatSignIn == null) return;
+        boolean hint;
+        synchronized (guiOutputBuffer) {
+            hint = AuthUrlOpener.containsAuthHostHint(guiOutputBuffer.toString());
+        }
+        if (!hint) hint = AuthUrlOpener.containsAuthHostHint(lastLinkedSnapshot);
+        final boolean highlighted = hint;
+        handler.post(() -> {
+            if (btnChatSignIn != null) btnChatSignIn.setAlpha(highlighted ? 1.0f : 0.45f);
+        });
+    }
+
+    /**
      * OpenCode linked turn: the prompt goes into the shared live server
      * session (see {@link OpenCodeLink}) and the reply streams back into
      * live bubbles — no per-message CLI cold start, and the same session is
@@ -1035,32 +1206,48 @@ public class AgentChatActivity extends AppCompatActivity {
         String selected = agentManager.getAgentModel(agent.id);
         final String modelId = (selected == null || selected.equals("default")) ? null : selected;
 
-        // Thinking level → the model's own server variant (linked mode).
-        // The level is resolved against the variant names the selected
-        // model actually defines; when it cannot be applied the user is
-        // told why, in the chat, instead of the level being silently
-        // dropped (the old Off-only dialog hid this entirely).
+        // Thinking level, two real routes (linked mode):
+        //  1. the model's own server variant, sent per-prompt;
+        //  2. when the model defines no matching variant, the level's
+        //     reasoning effort in the serve config (reasoningEffort) —
+        //     reconciled here, before the send, so a stale-config server
+        //     is stopped and this very send restarts it with the config.
+        // Only when NEITHER route can carry the level is the user told it
+        // was not applied — never a silent drop.
         final String thinkingLevel = agentManager.getAgentThinkingLevel(agent.id);
         final String effectiveModel = modelId != null ? modelId : agentManager.getCachedRealModel(agent.id);
+        final boolean configChanged = agentManager.applyOpenCodeThinkingConfig();
         final String variant = agentManager.resolveThinkingVariant(agent.id, effectiveModel, thinkingLevel);
-        if (thinkingLevel != null && !thinkingLevel.startsWith("Off") && variant == null) {
-            java.util.List<String> known = agentManager.getModelVariants(effectiveModel);
-            String modelName = effectiveModel == null ? "This model" : effectiveModel;
-            String why;
-            if (known == null) {
-                why = "variant support for " + modelName + " has not been fetched yet"
-                        + " — open the model picker once and tap Query / Refresh.";
-            } else if (known.isEmpty()) {
-                why = modelName + " exposes no thinking variants"
-                        + " — it reasons at its own default.";
-            } else {
-                why = modelName + " only offers these thinking variants: "
-                        + TextUtils.join(", ", known) + ".";
+        final String configEffort = com.termux.app.terminal.OpenCodeLink.getConfigEffort();
+        final boolean configApplies = variant == null && configEffort != null
+                && effectiveModel != null
+                && effectiveModel.equals(com.termux.app.terminal.OpenCodeLink.getConfigEffortModel());
+        if (thinkingLevel != null && !thinkingLevel.startsWith("Off")) {
+            if (configApplies && configChanged) {
+                adapter.add(new ChatMessage(ChatMessage.Type.STATUS,
+                        "🧠 Thinking \"" + thinkingLevel + "\" applied via OpenCode config "
+                                + "(reasoningEffort=" + configEffort + " for " + effectiveModel
+                                + ") — the shared server restarted once to pick it up."));
+                scrollToBottom();
+            } else if (variant == null && !configApplies) {
+                java.util.List<String> known = agentManager.getModelVariants(effectiveModel);
+                String modelName = effectiveModel == null ? "This model" : effectiveModel;
+                String why;
+                if (known == null) {
+                    why = "variant support for " + modelName + " has not been fetched yet"
+                            + " — open the model picker once and tap Query / Refresh.";
+                } else if (known.isEmpty()) {
+                    why = modelName + " exposes no thinking variants"
+                            + " — it reasons at its own default.";
+                } else {
+                    why = modelName + " only offers these thinking variants: "
+                            + TextUtils.join(", ", known) + ".";
+                }
+                adapter.add(new ChatMessage(ChatMessage.Type.STATUS,
+                        "🧠 Thinking \"" + thinkingLevel + "\" not applied: " + why
+                                + " Prompt sent without a variant."));
+                scrollToBottom();
             }
-            adapter.add(new ChatMessage(ChatMessage.Type.STATUS,
-                    "🧠 Thinking \"" + thinkingLevel + "\" not applied: " + why
-                            + " Prompt sent without a variant."));
-            scrollToBottom();
         }
 
         openCodeLink.sendPrompt(workspace(), effectivePrompt, modelId, variant, new OpenCodeLink.Listener() {
@@ -1076,8 +1263,16 @@ public class AgentChatActivity extends AppCompatActivity {
             }
 
             @Override
+            public void onHistory(List<OpenCodeLink.HistoryMessage> messages) {
+                if (isFinishing() || isDestroyed()) return;
+                renderSharedHistory(agent, messages);
+            }
+
+            @Override
             public void onText(String snapshot) {
                 if (isFinishing() || isDestroyed()) return;
+                lastLinkedSnapshot = snapshot == null ? "" : snapshot;
+                updateSignInHighlight();
                 AuthUrlOpener.openAuthUrlIfPresent(AgentChatActivity.this, snapshot, agent.name);
                 markFirstOutput(agent);
                 updateLiveBubble(agent, false, snapshot);
@@ -1589,6 +1784,9 @@ public class AgentChatActivity extends AppCompatActivity {
                 .setSingleChoiceItems(itemArray, selectedIndex, (dialog, which) -> {
                     if (which == 0) {
                         agentManager.setAgentModel(agent.id, null);
+                        if (agent.id.equals("opencode")) {
+                            agentManager.applyOpenCodeThinkingConfig();
+                        }
                         updateModelAndThinkingChips();
                         Toast.makeText(this, "Model set to " + defaultLabel, Toast.LENGTH_SHORT).show();
                         dialog.dismiss();
@@ -1610,6 +1808,9 @@ public class AgentChatActivity extends AppCompatActivity {
                     } else {
                         String selected = models.get(which - 1);
                         agentManager.setAgentModel(agent.id, selected);
+                        if (agent.id.equals("opencode")) {
+                            agentManager.applyOpenCodeThinkingConfig();
+                        }
                         updateModelAndThinkingChips();
                         Toast.makeText(this, "Model set to " + selected, Toast.LENGTH_SHORT).show();
                         dialog.dismiss();
@@ -1639,6 +1840,11 @@ public class AgentChatActivity extends AppCompatActivity {
                     String val = input.getText().toString().trim();
                     if (!val.isEmpty()) {
                         agentManager.setAgentModel(agent.id, val);
+                        if (agent.id.equals("opencode")) {
+                            // A model switch can move the thinking level
+                            // between the variant route and the config route.
+                            agentManager.applyOpenCodeThinkingConfig();
+                        }
                         updateModelAndThinkingChips();
                         Toast.makeText(this, "Model changed to " + val, Toast.LENGTH_SHORT).show();
                     }
@@ -1663,40 +1869,78 @@ public class AgentChatActivity extends AppCompatActivity {
             }
         }
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
-                .setTitle("🧠 Thinking Budget (" + agent.name + ")")
-                .setSingleChoiceItems(labels, selectedIndex, (dialog, which) -> {
-                    String selected = levels.get(which);
-                    agentManager.setAgentThinkingLevel(agent.id, selected);
-                    updateModelAndThinkingChips();
-                    Toast.makeText(this, "Thinking set to " + selected, Toast.LENGTH_SHORT).show();
-                    dialog.dismiss();
-                })
-                .setNegativeButton("Cancel", null);
+        // The dialog body is a custom view — an optional note line stacked
+        // ABOVE a single-choice list — never the builder's setMessage +
+        // setSingleChoiceItems combination. That combination is broken in
+        // the framework AlertDialog: when a message is set,
+        // AlertController.setupContent() fills the content panel with the
+        // message view and never adds the list, so the OpenCode dialog
+        // showed ONLY its explanatory note and no selectable levels at
+        // all (the bug X hit: "opencode ka thinking open nahi ho raha").
+        // A custom view is the one construction where note and items
+        // coexist, for every agent.
+        android.widget.LinearLayout body = new android.widget.LinearLayout(this);
+        body.setOrientation(android.widget.LinearLayout.VERTICAL);
+
+        String note = null;
         if (agent.id.equals("opencode")) {
-            // Linked mode applies the level as the model's server variant.
-            // Say up front what this model supports, so a level that cannot
-            // apply is never a silent surprise later.
+            // How a level reaches OpenCode depends on the model: models
+            // that define thinking variants take the level per-prompt (no
+            // restart); models without variants — big-pickle defines none
+            // — take it through the server config's reasoningEffort, which
+            // needs one server restart to apply. One honest line either
+            // way, and the levels stay visible regardless.
             String sel = agentManager.getAgentModel(agent.id);
             String effectiveModel = (sel == null || sel.equals("default"))
                     ? agentManager.getCachedRealModel(agent.id) : sel;
             java.util.List<String> known = agentManager.getModelVariants(effectiveModel);
             String modelName = effectiveModel == null ? "The current model" : effectiveModel;
             if (known == null) {
-                builder.setMessage("OpenCode applies thinking as the model's server variant. "
-                        + "Variant support for " + modelName + " has not been fetched yet — "
-                        + "open the model picker once and tap Query / Refresh.");
+                note = "Variant support for " + modelName + " has not been fetched yet — "
+                        + "open the model picker once and tap Query / Refresh.";
             } else if (known.isEmpty()) {
-                builder.setMessage(modelName + " exposes no thinking variants — any level "
-                        + "picked here is saved, but prompts are sent without a variant and "
-                        + "the model reasons at its own default.");
+                note = "Applies via OpenCode config; the server restarts once when you change it.";
             } else {
-                builder.setMessage(modelName + " offers these thinking variants: "
-                        + TextUtils.join(", ", known) + ". Levels that don't map to one of "
-                        + "these are not sent.");
+                note = modelName + " offers these thinking variants: "
+                        + TextUtils.join(", ", known) + ". Levels apply per prompt — no restart.";
             }
         }
-        showDialogSafely(builder);
+        if (note != null) {
+            TextView noteView = new TextView(this);
+            noteView.setText(note);
+            noteView.setTextSize(13);
+            noteView.setPadding(48, 24, 48, 8);
+            body.addView(noteView);
+        }
+
+        android.widget.ListView list = new android.widget.ListView(this);
+        list.setChoiceMode(android.widget.ListView.CHOICE_MODE_SINGLE);
+        list.setAdapter(new android.widget.ArrayAdapter<>(this,
+                android.R.layout.simple_list_item_single_choice, labels));
+        list.setItemChecked(selectedIndex, true);
+        body.addView(list);
+
+        final AlertDialog[] holder = new AlertDialog[1];
+        list.setOnItemClickListener((parent, view, which, id) -> {
+            String selectedLevel = levels.get(which);
+            agentManager.setAgentThinkingLevel(agent.id, selectedLevel);
+            if (agent.id.equals("opencode")) {
+                // Reconcile the config-route override with the new level:
+                // variant-capable models clear it, variant-less models get
+                // the effort written into the serve config (one restart).
+                agentManager.applyOpenCodeThinkingConfig();
+            }
+            updateModelAndThinkingChips();
+            Toast.makeText(this, "Thinking set to " + selectedLevel, Toast.LENGTH_SHORT).show();
+            if (holder[0] != null) holder[0].dismiss();
+        });
+
+        holder[0] = new AlertDialog.Builder(this)
+                .setTitle("🧠 Thinking Budget (" + agent.name + ")")
+                .setView(body)
+                .setNegativeButton("Cancel", null)
+                .create();
+        showDialogSafely(holder[0]);
     }
 
     // ------------------------------------------------------------------

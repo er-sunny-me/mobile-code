@@ -1140,6 +1140,46 @@ public class CLIAgentManager {
         return OpenCodeLink.resolveVariant(level, getModelVariants(modelId));
     }
 
+    /**
+     * Reconcile OpenCode's config-route thinking override with the stored
+     * level and the currently effective model. The level reaches the
+     * server by exactly one route at a time:
+     *
+     * <ul>
+     *   <li>level Off, or the level maps to a variant the model defines →
+     *       the per-prompt variant route; the config override is cleared.</li>
+     *   <li>otherwise (the model defines no matching variant — big-pickle
+     *       defines none at all) → the level's reasoning effort is written
+     *       into the serve config for that model
+     *       ({@link OpenCodeLink#buildConfigContent}); a running app-owned
+     *       server is stopped so it restarts once with the new config.</li>
+     * </ul>
+     *
+     * Safe to call whenever the level or the model changes and before
+     * every linked turn; it is a no-op when the state already matches.
+     *
+     * @return true when the override state changed (a server restart is
+     *         pending on the next start)
+     */
+    public boolean applyOpenCodeThinkingConfig() {
+        String selected = getAgentModel("opencode");
+        String effectiveModel = (selected == null || selected.equals("default"))
+                ? getCachedRealModel("opencode") : selected;
+        String level = getAgentThinkingLevel("opencode");
+        String variant = resolveThinkingVariant("opencode", effectiveModel, level);
+        if (variant != null || level == null || level.startsWith("Off")) {
+            return OpenCodeLink.applyConfigReasoningEffort(null, null);
+        }
+        String effort = OpenCodeLink.effortForLevel(level);
+        if (effort == null || effectiveModel == null) {
+            // Cannot aim the override at an unknown model yet; leave the
+            // state alone — the next turn re-runs this once the real
+            // model has been fetched.
+            return false;
+        }
+        return OpenCodeLink.applyConfigReasoningEffort(effectiveModel, effort);
+    }
+
     public void saveLiveModelsCache(String agentId, List<String> models) {
         if (models == null || models.isEmpty()) return;
         StringBuilder sb = new StringBuilder();
@@ -1457,6 +1497,43 @@ public class CLIAgentManager {
     }
 
     /**
+     * True when {@code cmdline} is a STANDALONE OpenCode TUI: an opencode
+     * process that is neither attached to the shared server ({@code
+     * attach}), nor the server itself ({@code serve}), nor a one-shot
+     * ({@code run}). A standalone TUI keeps its own session and can never
+     * join the GUI's shared conversation — callers use this to tell the
+     * user so, instead of letting them assume a sync that isn't there.
+     * Pure and unit-testable.
+     */
+    public static boolean isStandaloneOpenCodeCmdline(String cmdline) {
+        if (cmdline == null) return false;
+        if (!"opencode".equals(matchAgentInCmdline(cmdline))) return false;
+        for (String token : cmdline.split("\u0000")) {
+            String t = token.trim();
+            if (t.equals("attach") || t.equals("serve") || t.equals("run")) return false;
+        }
+        return true;
+    }
+
+    /**
+     * True when a standalone OpenCode TUI (see
+     * {@link #isStandaloneOpenCodeCmdline}) is alive in the process tree
+     * of terminal session {@code sessionPid}.
+     */
+    public static boolean isStandaloneOpenCodeTuiInSession(int sessionPid) {
+        if (sessionPid <= 0) return false;
+        try {
+            java.util.Map<Integer, java.util.List<Integer>> children = readProcChildrenMap(sessionPid);
+            for (int pid : collectDescendantPids(sessionPid, children)) {
+                String cmdline = readSmallTextFile(new File("/proc/" + pid + "/cmdline"));
+                if (cmdline != null && isStandaloneOpenCodeCmdline(cmdline)) return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    /**
      * Parent→children map for the tree under {@code rootPid}. Fast path:
      * {@code /proc/<pid>/task/<pid>/children} walked recursively (only the
      * session's own tree is touched). Fallback when no children file is
@@ -1602,6 +1679,22 @@ public class CLIAgentManager {
     }
 
     /**
+     * THE one command that starts OpenCode in a terminal: shell prelude +
+     * ensure-the-shared-server + attach to it with the resolver's current
+     * session id. Every terminal entry point for OpenCode —
+     * {@link #buildLaunchCommand} (spinner, chat terminal button) and
+     * {@link #buildLoginCommand} (dashboard/chat Login) — must go through
+     * here; any path that falls back to the raw run template starts a
+     * standalone TUI in its own session and silently breaks GUI↔CLI sync
+     * (the dashboard/chat Login path did exactly that until this was
+     * factored out).
+     */
+    private String openCodeSharedTerminalCommand() {
+        return shellPrelude()
+            + OpenCodeLink.buildTerminalCommand(OpenCodeLink.getSessionId());
+    }
+
+    /**
      * Build the terminal command to launch the given agent interactively.
      */
     public String buildLaunchCommand(CLIAgent agent, String prompt, String workspace) {
@@ -1617,18 +1710,23 @@ public class CLIAgentManager {
 
         cmd = shellPrelude() + cmd;
 
-        // Linked mode: when the shared OpenCode server (started by the GUI
-        // chat, see OpenCodeLink) is alive, the terminal must attach to THAT
+        // Linked mode: the terminal must attach to the SHARED OpenCode
         // server instead of starting a separate TUI instance — one live
-        // session, shared by GUI and CLI, same conversation on both sides.
-        // The attach must also name the GUI's session (--session <id>,
-        // read fresh here at terminal-open time): a bare attach lands the
-        // TUI in a NEW empty session, which a phone test caught — the GUI
-        // conversation was nowhere to be seen in the CLI.
-        if (agent.id.equals("opencode") && OpenCodeLink.isServerUp()) {
-            cmd = shellPrelude()
-                + "export PATH=\"$HOME/.opencode/bin:$PATH\" && "
-                + OpenCodeLink.buildAttachCommand(OpenCodeLink.getSessionId());
+        // session, shared by GUI and CLI, same conversation on both sides,
+        // in BOTH open orders:
+        //  - GUI first: the server is already up; the command's ensure
+        //    step is a no-op probe and the attach names the GUI's session
+        //    (--session <id>, read fresh here at terminal-open time — a
+        //    bare attach lands the TUI in a NEW empty session, which a
+        //    phone test caught).
+        //  - Terminal first: no server exists yet, so the command starts
+        //    it (same serve invocation + config the app itself uses)
+        //    before attaching; when the GUI later sends, it adopts the
+        //    session this TUI created (see OpenCodeLink session adoption).
+        // Without the workshop there is no shared environment to serve
+        // from, so the plain template command stays as the fallback.
+        if (agent.id.equals("opencode") && isWorkshopAvailable()) {
+            cmd = openCodeSharedTerminalCommand();
         }
 
         // Prepend Anthropic vars if Claude Code is selected
@@ -1950,6 +2048,14 @@ public class CLIAgentManager {
                 .replace("{prompt}", "")
                 .replace("{workspace}", workspace);
         String cmd = shellPrelude() + interactive;
+        // OpenCode login goes through the SHARED terminal command too:
+        // signing in from a standalone TUI session leaves the GUI chat in
+        // a different session than the one the user just used — the exact
+        // "GUI and CLI are not synced" complaint. Inside the attached
+        // TUI, /connect and friends work the same.
+        if (agent.id.equals("opencode") && isWorkshopAvailable()) {
+            cmd = openCodeSharedTerminalCommand();
+        }
         if (agent.id.equals("claude_code")) {
             cmd = anthropicExports() + cmd;
         }

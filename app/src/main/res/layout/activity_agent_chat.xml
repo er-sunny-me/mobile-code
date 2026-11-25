@@ -77,6 +77,20 @@
             android:contentDescription="Open in terminal"
             android:src="@drawable/ic_terminal"
             app:tint="@color/zc_text_secondary" />
+
+        <!-- Sign-in: deterministic manual path for agent OAuth URLs in
+             the chat output (auto-open is best-effort; this always scans
+             the accumulated output and opens the link, or says why not).
+             Dimmed until output contains an auth host. -->
+        <ImageButton
+            android:id="@+id/btn_chat_signin"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:alpha="0.45"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Open sign-in link"
+            android:src="@drawable/ic_signin_lock"
+            app:tint="@color/zc_text_secondary" />
     </LinearLayout>
 
     <!-- Model & Thinking configuration strip -->

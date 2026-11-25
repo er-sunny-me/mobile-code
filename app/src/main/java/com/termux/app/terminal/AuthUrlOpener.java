@@ -298,7 +298,7 @@ public class AuthUrlOpener {
     /**
      * If {@code text} contains an auth URL that has not been opened yet,
      * open it in the device browser and toast why. Returns true when a
-     * browser launch was attempted.
+     * browser launch succeeded.
      */
     public static synchronized boolean openAuthUrlIfPresent(Context context, String text,
                                                             String sourceLabel) {
@@ -306,25 +306,148 @@ public class AuthUrlOpener {
         String url = findAuthUrl(text);
         if (url == null) return false;
         if (openedUrls.contains(url)) return false;
-        openedUrls.add(url);
-        while (openedUrls.size() > MAX_REMEMBERED_URLS) {
-            java.util.Iterator<String> it = openedUrls.iterator();
-            it.next();
-            it.remove();
-        }
+        return launchAndRemember(context, url, sourceLabel);
+    }
+
+    /**
+     * Launch {@code url} and remember it ONLY when the launch actually
+     * succeeded. The URL used to be recorded BEFORE startActivity: when
+     * the launch was refused (no handler, a background-start restriction,
+     * a transient failure), the URL was nevertheless marked "opened" and
+     * every later scan — and the whole rest of the app run — silently
+     * suppressed it. A failed launch must stay retryable.
+     */
+    private static boolean launchAndRemember(Context context, String url, String sourceLabel) {
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(intent);
-            Toast.makeText(context,
-                    "🔐 Opening " + (sourceLabel == null ? "agent" : sourceLabel)
-                            + " sign-in in your browser…",
-                    Toast.LENGTH_LONG).show();
-            return true;
         } catch (Exception e) {
             // No browser / launch refused: the URL stays visible in the
-            // output for manual copy, exactly as before this feature.
+            // output for manual copy, and — not being remembered — a
+            // later scan or an explicit Sign-in tap can retry it.
             return false;
         }
+        synchronized (AuthUrlOpener.class) {
+            openedUrls.add(url);
+            while (openedUrls.size() > MAX_REMEMBERED_URLS) {
+                java.util.Iterator<String> it = openedUrls.iterator();
+                it.next();
+                it.remove();
+            }
+        }
+        Toast.makeText(context,
+                "🔐 Opening " + (sourceLabel == null ? "agent" : sourceLabel)
+                        + " sign-in in your browser…",
+                Toast.LENGTH_LONG).show();
+        return true;
+    }
+
+    // ------------------------------------------------------------------
+    // Assessment (for the deterministic Sign-in button)
+    // ------------------------------------------------------------------
+
+    /** What a scan of some output text found, auth-wise. */
+    public enum AuthTextState {
+        /** No sign-in link, complete or otherwise, is present. */
+        NONE,
+        /** An auth endpoint is visibly involved but no COMPLETE link can
+         *  be extracted yet (still printing, or cut off in the buffer). */
+        PARTIAL,
+        /** A complete, openable sign-in URL is present. */
+        COMPLETE
+    }
+
+    /** Result of {@link #assessAuthText}: the state, plus the URL when COMPLETE. */
+    public static class AuthAssessment {
+        public final AuthTextState state;
+        public final String url;
+
+        AuthAssessment(AuthTextState state, String url) {
+            this.state = state;
+            this.url = url;
+        }
+    }
+
+    /**
+     * Raw auth-host substrings whose mere presence in output means a
+     * sign-in flow is on screen, even before a complete URL can be
+     * extracted. Cheap {@code contains} checks — robust where full
+     * extraction is not (yet). Mirrors the hosts of {@link #isAuthUrl}.
+     */
+    private static final String[] AUTH_HOST_HINTS = {
+            "accounts.google.com",
+            "github.com/login/device",
+            "claude.ai/oauth",
+            "console.anthropic.com",
+            "auth.openai.com",
+            "chatgpt.com/auth",
+            "signin.aws.amazon.com",
+            "accounts.x.ai",
+            "auth.x.ai",
+            ".amazonaws.com/oauth",
+            ".amazonaws.com/authorize",
+    };
+
+    /** True when any known auth host shows up in {@code text} at all. */
+    public static boolean containsAuthHostHint(String text) {
+        if (text == null) return false;
+        for (String hint : AUTH_HOST_HINTS) {
+            if (text.contains(hint)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Classify {@code text} for the Sign-in button: COMPLETE with the
+     * URL when {@link #findAuthUrl} extracts one; PARTIAL when an auth
+     * candidate is present but fails the completeness gate (still
+     * printing) or an auth host substring is present without an
+     * extractable candidate; NONE otherwise. Pure and unit-testable.
+     */
+    public static AuthAssessment assessAuthText(String text) {
+        if (text == null || text.isEmpty()) {
+            return new AuthAssessment(AuthTextState.NONE, null);
+        }
+        String url = findAuthUrl(text);
+        if (url != null) return new AuthAssessment(AuthTextState.COMPLETE, url);
+        // No complete URL: is an auth candidate visibly in progress?
+        int from = 0;
+        while (from < text.length()) {
+            int start = indexOfScheme(text, from);
+            if (start < 0) break;
+            Candidate c = extractCandidate(text, start);
+            if (c == null) {
+                from = start + 8;
+                continue;
+            }
+            String candidate = stripTrailingJunk(c.text);
+            if (isAuthUrl(candidate)) {
+                return new AuthAssessment(AuthTextState.PARTIAL, null);
+            }
+            from = Math.max(c.endIndex, start + 8);
+        }
+        if (containsAuthHostHint(text)) {
+            return new AuthAssessment(AuthTextState.PARTIAL, null);
+        }
+        return new AuthAssessment(AuthTextState.NONE, null);
+    }
+
+    /**
+     * The deterministic path behind the visible "🔐 Sign-in" button: the
+     * user tapped it, so a complete URL is opened EVEN IF auto-open
+     * already opened it once (an explicit tap is a new instruction, not
+     * a rescan). Returns the assessment so the caller can report the
+     * PARTIAL / NONE states truthfully instead of guessing.
+     */
+    public static AuthAssessment openAuthUrlManually(Context context, String text,
+                                                       String sourceLabel) {
+        AuthAssessment assessment = assessAuthText(text);
+        if (assessment.state != AuthTextState.COMPLETE || context == null) {
+            return assessment;
+        }
+        boolean launched = launchAndRemember(context, assessment.url, sourceLabel);
+        return launched ? assessment
+                : new AuthAssessment(AuthTextState.PARTIAL, null);
     }
 }
