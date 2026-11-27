@@ -25,9 +25,11 @@ import com.termux.shared.termux.shell.command.environment.TermuxShellEnvironment
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -178,7 +180,8 @@ public final class TermuxInstaller {
 
                     Logger.logInfo(LOG_TAG, "Extracting bootstrap zip to prefix staging directory \"" + TERMUX_STAGING_PREFIX_DIR_PATH + "\".");
 
-                    final byte[] buffer = new byte[8096];
+                    final byte[] buffer = new byte[8192];
+                    final ByteArrayOutputStream entryBytes = new ByteArrayOutputStream(65536);
                     final List<Pair<String, String>> symlinks = new ArrayList<>(50);
 
                     final byte[] zipBytes = loadZipBytes();
@@ -192,8 +195,8 @@ public final class TermuxInstaller {
                                     String[] parts = line.split("←");
                                     if (parts.length != 2)
                                         throw new RuntimeException("Malformed symlink line: " + line);
-                                    String oldPath = parts[0];
-                                    String newPath = TERMUX_STAGING_PREFIX_DIR_PATH + "/" + parts[1];
+                                    String oldPath = patchPackageString(parts[0]);
+                                    String newPath = TERMUX_STAGING_PREFIX_DIR_PATH + "/" + patchPackageString(parts[1]);
                                     symlinks.add(Pair.create(oldPath, newPath));
 
                                     error = ensureDirectoryExists(new File(newPath).getParentFile());
@@ -214,10 +217,15 @@ public final class TermuxInstaller {
                                 }
 
                                 if (!isDirectory) {
+                                    entryBytes.reset();
+                                    int readBytes;
+                                    while ((readBytes = zipInput.read(buffer)) != -1) {
+                                        entryBytes.write(buffer, 0, readBytes);
+                                    }
+                                    byte[] raw = entryBytes.toByteArray();
+                                    patchPackageBytesInPlace(raw, raw.length);
                                     try (FileOutputStream outStream = new FileOutputStream(targetFile)) {
-                                        int readBytes;
-                                        while ((readBytes = zipInput.read(buffer)) != -1)
-                                            outStream.write(buffer, 0, readBytes);
+                                        outStream.write(raw);
                                     }
                                     if (zipEntryName.startsWith("bin/") || zipEntryName.startsWith("libexec") ||
                                         zipEntryName.startsWith("lib/apt/apt-helper") || zipEntryName.startsWith("lib/apt/methods")) {
@@ -417,6 +425,53 @@ public final class TermuxInstaller {
 
     private static Error ensureDirectoryExists(File directory) {
         return FileUtils.createDirectoryFile(directory.getAbsolutePath());
+    }
+
+    private static final byte[] LEGACY_PKG_BYTES = "com.termux".getBytes(StandardCharsets.US_ASCII);
+
+    /**
+     * Rewrite any {@code com.termux} prefix references inside symlink strings when
+     * the current package name has the exact same length (e.g. {@code com.xyzide}).
+     */
+    public static String patchPackageString(String value) {
+        if (value == null) return null;
+        String pkg = TermuxConstants.TERMUX_PACKAGE_NAME;
+        if (pkg == null || pkg.length() != LEGACY_PKG_BYTES.length || "com.termux".equals(pkg)) {
+            return value;
+        }
+        return value.replace("com.termux", pkg);
+    }
+
+    /**
+     * Byte-patch any {@code com.termux} occurrence inside an extracted bootstrap
+     * entry in place when the current package name has the same byte length
+     * (10 bytes, {@code com.xyzide}). Keeps ELF offsets intact while guaranteeing
+     * scripts such as {@code bin/pkg} never retain {@code /data/data/com.termux}.
+     */
+    public static int patchPackageBytesInPlace(byte[] data, int length) {
+        if (data == null || length < LEGACY_PKG_BYTES.length) return 0;
+        String pkg = TermuxConstants.TERMUX_PACKAGE_NAME;
+        if (pkg == null || pkg.length() != LEGACY_PKG_BYTES.length || "com.termux".equals(pkg)) {
+            return 0;
+        }
+        byte[] target = pkg.getBytes(StandardCharsets.US_ASCII);
+        int replaced = 0;
+        int limit = length - LEGACY_PKG_BYTES.length;
+        for (int i = 0; i <= limit; i++) {
+            boolean match = true;
+            for (int j = 0; j < LEGACY_PKG_BYTES.length; j++) {
+                if (data[i + j] != LEGACY_PKG_BYTES[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                System.arraycopy(target, 0, data, i, target.length);
+                i += LEGACY_PKG_BYTES.length - 1;
+                replaced++;
+            }
+        }
+        return replaced;
     }
 
     public static byte[] loadZipBytes() {

@@ -546,7 +546,8 @@ public class SetupWizardActivity extends AppCompatActivity {
             pb.environment().put("PREFIX", TermuxConstants.TERMUX_PREFIX_DIR_PATH);
             pb.environment().put("HOME", TermuxConstants.TERMUX_HOME_DIR_PATH);
             pb.environment().put("PATH", TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/"
-                    + ":" + TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/applets");
+                    + ":" + TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/applets"
+                    + ":/system/bin:/system/xbin");
             pb.environment().put("LD_LIBRARY_PATH", TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/lib");
             pb.environment().put("TMPDIR", TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/tmp");
             pb.redirectErrorStream(true);
@@ -604,6 +605,11 @@ public class SetupWizardActivity extends AppCompatActivity {
             if (stagingError != null) appendLog("Wipe warning: " + stagingError.getMessage());
         } catch (Exception e) {
             appendLog("Wipe failed: " + e.getMessage());
+        }
+        if (com.termux.shared.termux.file.TermuxFileUtils
+                .isTermuxFilesDirectoryAccessible(this, true, true) != null) {
+            appendLog("Base system: app files directory is not accessible.");
+            return false;
         }
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicBoolean ok = new AtomicBoolean(false);
@@ -754,7 +760,11 @@ public class SetupWizardActivity extends AppCompatActivity {
         ShellResult first = execTermux(install, homePath());
         if (first.exit == 0 || cancelled.get()) return first;
         appendLog("proot-distro install hit a package problem — repairing and retrying once…");
-        return execTermux("dpkg --configure -a >/dev/null 2>&1; " + install, homePath());
+        RepoCompatInstaller.ensureInstalled();
+        String repairAndInstall = "dpkg --configure -a >/dev/null 2>&1; "
+                + install
+                + " || { apt-get update -y && apt-get install -y ncurses ncurses-utils proot-distro; }";
+        return execTermux(repairAndInstall, homePath());
     }
 
     private boolean doAgentsStep(SetupStep step) {
@@ -778,9 +788,9 @@ public class SetupWizardActivity extends AppCompatActivity {
             if (row.checked) chosen.add(row.agent);
         }
         if (chosen.isEmpty()) {
-            step.detail = "No agents selected — tick at least one above, or Skip.";
+            step.detail = "No agents selected — skipping step.";
             appendLog("Agents: nothing selected.");
-            return false;
+            return true; // Mark as done since there is nothing to do.
         }
 
         int ready = 0;
@@ -902,7 +912,8 @@ public class SetupWizardActivity extends AppCompatActivity {
             pb.environment().put("PREFIX", TermuxConstants.TERMUX_PREFIX_DIR_PATH);
             pb.environment().put("HOME", TermuxConstants.TERMUX_HOME_DIR_PATH);
             pb.environment().put("PATH", TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/"
-                    + ":" + TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/applets");
+                    + ":" + TermuxConstants.TERMUX_BIN_PREFIX_DIR_PATH + "/applets"
+                    + ":/system/bin:/system/xbin");
             pb.environment().put("LD_LIBRARY_PATH", TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/lib");
             pb.environment().put("TMPDIR", TermuxConstants.TERMUX_PREFIX_DIR_PATH + "/tmp");
             pb.environment().put("TERM", "xterm-256color");

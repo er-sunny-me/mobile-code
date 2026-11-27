@@ -48,6 +48,7 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
     private LineNumberEditText etHomeCode;
     private File currentEditingFile;
     private FileObserver workspaceObserver;
+    private boolean initialPermissionsRequested;
 
     private void startWorkspaceObserver() {
         if (workspaceObserver != null) {
@@ -74,6 +75,12 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
         }
         loadFiles();
         checkPendingCrashReport();
+        if (!initialPermissionsRequested
+                && com.termux.app.setup.SetupWizardActivity.isSetupCompleted(this)) {
+            initialPermissionsRequested = true;
+            requestManageExternalStorageIfNeeded();
+            requestPostNotificationsIfNeeded();
+        }
     }
 
     private void checkPendingCrashReport() {
@@ -126,12 +133,16 @@ public class ZeroCodeHomeActivity extends AppCompatActivity {
 
         // First launch: show the setup wizard (permissions, Termux base, Linux
         // system, coding agents) on top of home. Home stays underneath.
+        // Do not stack Settings/permission prompts on top of the wizard here;
+        // the wizard handles storage access as step 1 and onResume handles the rest
+        // once setup is completed or skipped.
         if (!com.termux.app.setup.SetupWizardActivity.isSetupCompleted(this)) {
             startActivity(new Intent(this, com.termux.app.setup.SetupWizardActivity.class));
+        } else {
+            initialPermissionsRequested = true;
+            requestManageExternalStorageIfNeeded();
+            requestPostNotificationsIfNeeded();
         }
-
-        requestManageExternalStorageIfNeeded();
-        requestPostNotificationsIfNeeded();
 
         android.content.SharedPreferences prefs = getSharedPreferences("ZeroCodePrefs", MODE_PRIVATE);
         String savedWorkspace = prefs.getString("workspace_path", null);

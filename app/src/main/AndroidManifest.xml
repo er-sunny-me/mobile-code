@@ -55,18 +55,6 @@
         android:theme="@style/Theme.TermuxApp.DayNight.DarkActionBar"
         android:usesCleartextTraffic="true"
         tools:targetApi="m">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.MyApplication"
-            android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
         <!--
          ═══════════════════════════════════════════════════
              ZeroCode-Studio HOME Activity (Main Entry Point)
@@ -192,6 +180,24 @@
             tools:targetApi="n" />
 
         <activity-alias
+            android:name=".app.api.file.FileViewReceiverActivity"
+            android:exported="true"
+            android:targetActivity=".app.api.file.FileReceiverActivity">
+
+            <!-- Accept multiple file types to let Termux be usable as generic file viewer. -->
+            <intent-filter tools:ignore="AppLinkUrlError">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="application/*" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="text/*" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
             android:name=".app.api.file.FileShareReceiverActivity"
             android:exported="true"
             android:targetActivity=".app.api.file.FileReceiverActivity">
@@ -207,24 +213,6 @@
                 <data android:mimeType="image/*" />
                 <data android:mimeType="message/*" />
                 <data android:mimeType="multipart/*" />
-                <data android:mimeType="text/*" />
-                <data android:mimeType="video/*" />
-            </intent-filter>
-        </activity-alias>
-        <activity-alias
-            android:name=".app.api.file.FileViewReceiverActivity"
-            android:exported="true"
-            android:targetActivity=".app.api.file.FileReceiverActivity">
-
-            <!-- Accept multiple file types to let Termux be usable as generic file viewer. -->
-            <intent-filter tools:ignore="AppLinkUrlError">
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-
-                <data android:mimeType="application/*" />
-                <data android:mimeType="audio/*" />
-                <data android:mimeType="image/*" />
                 <data android:mimeType="text/*" />
                 <data android:mimeType="video/*" />
             </intent-filter>

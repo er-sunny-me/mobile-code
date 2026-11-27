@@ -17,44 +17,22 @@ ext {
 }
 
 android {
-    namespace "com.termux"
+    namespace = "com.termux"
 
-    compileSdkVersion project.properties.compileSdkVersion.toInteger()
+    compileSdk project.properties.compileSdkVersion.toInteger()
     ndkVersion = System.getenv("JITPACK_NDK_VERSION") ?: project.properties.ndkVersion
     def appVersionName = System.getenv("TERMUX_APP_VERSION_NAME") ?: ""
     def apkVersionTag = System.getenv("TERMUX_APK_VERSION_TAG") ?: ""
     def splitAPKsForDebugBuilds = System.getenv("TERMUX_SPLIT_APKS_FOR_DEBUG_BUILDS") ?: "1"
     def splitAPKsForReleaseBuilds = System.getenv("TERMUX_SPLIT_APKS_FOR_RELEASE_BUILDS") ?: "0" // F-Droid does not support split APKs #1904
 
-    dependencies {
-        implementation "androidx.annotation:annotation:1.9.0"
-        implementation "androidx.core:core:1.13.1"
-        implementation "androidx.drawerlayout:drawerlayout:1.2.0"
-        implementation "androidx.preference:preference:1.2.1"
-        implementation "androidx.viewpager:viewpager:1.0.0"
-        implementation "androidx.lifecycle:lifecycle-runtime:2.7.0"
-        implementation "androidx.room:room-runtime:2.6.1"
-        implementation "com.squareup.okhttp3:okhttp:4.11.0"
-        implementation "io.reactivex.rxjava3:rxjava:3.1.7"
-        implementation "com.google.android.material:material:1.12.0"
-        implementation "com.google.guava:guava:24.1-jre"
-        implementation "io.noties.markwon:core:$markwonVersion"
-        implementation "io.noties.markwon:ext-strikethrough:$markwonVersion"
-        implementation "io.noties.markwon:linkify:$markwonVersion"
-        implementation "io.noties.markwon:recycler:$markwonVersion"
-        implementation 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
-
-        implementation project(":terminal-view")
-        implementation project(":termux-shared")
-    }
-
     defaultConfig {
-        minSdkVersion project.properties.minSdkVersion.toInteger()
-        targetSdkVersion project.properties.targetSdkVersion.toInteger()
-        multiDexEnabled true
-        applicationId "com.xyzide"
-        versionCode 132
-        versionName "0.1.1"
+        minSdk project.properties.minSdkVersion.toInteger()
+        targetSdk project.properties.targetSdkVersion.toInteger()
+        multiDexEnabled = true
+        applicationId = "com.xyzide"
+        versionCode = 132
+        versionName = "0.1.1"
 
         if (appVersionName) versionName = appVersionName
         validateVersionName(versionName)
@@ -78,47 +56,47 @@ android {
 
         splits {
             abi {
-                enable ((gradle.startParameter.taskNames.any { it.contains("Debug") } && splitAPKsForDebugBuilds == "1") ||
+                enable = ((gradle.startParameter.taskNames.any { it.contains("Debug") } && splitAPKsForDebugBuilds == "1") ||
                     (gradle.startParameter.taskNames.any { it.contains("Release") } && splitAPKsForReleaseBuilds == "1"))
                 reset ()
                 include 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
-                universalApk true
+                universalApk = true
             }
         }
     }
 
     signingConfigs {
         debug {
-            storeFile file('testkey_untrusted.jks')
-            keyAlias 'alias'
-            storePassword System.getenv("DEBUG_KEYSTORE_PASSWORD") ?: 'xrj45yWGLbsO7W0v'
-            keyPassword System.getenv("DEBUG_KEY_PASSWORD") ?: 'xrj45yWGLbsO7W0v'
+            storeFile = file('testkey_untrusted.jks')
+            keyAlias = 'alias'
+            storePassword = System.getenv("DEBUG_KEYSTORE_PASSWORD") ?: 'xrj45yWGLbsO7W0v'
+            keyPassword = System.getenv("DEBUG_KEY_PASSWORD") ?: 'xrj45yWGLbsO7W0v'
         }
         release {
-            storeFile file(System.getenv("KEYSTORE_FILE") ?: "release.keystore")
-            keyAlias System.getenv("KEY_ALIAS") ?: "alias"
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "dummy_password"
-            keyPassword System.getenv("KEY_PASSWORD") ?: "dummy_password"
+            storeFile = file(System.getenv("KEYSTORE_FILE") ?: "release.keystore")
+            keyAlias = System.getenv("KEY_ALIAS") ?: "alias"
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "dummy_password"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "dummy_password"
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled false
-            debuggable false
-            shrinkResources false // Reproducible builds
+            minifyEnabled = false
+            debuggable = false
+            shrinkResources = false // Reproducible builds
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            signingConfig = signingConfigs.release
         }
 
         debug {
-            signingConfig signingConfigs.debug
+            signingConfig = signingConfigs.debug
         }
     }
 
     compileOptions {
         // Flag to enable support for the new language APIs
-        coreLibraryDesugaringEnabled true
+        coreLibraryDesugaringEnabled = true
 
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
@@ -140,16 +118,16 @@ android {
         }
     }
 
-    packagingOptions {
+    packaging {
         jniLibs {
-            useLegacyPackaging true
+            useLegacyPackaging = true
         }
     }
 
     // Compressed bundle files use the neutral .tar.bin suffix: AAPT2 gunzips
     // anything ending in .gz and strips the suffix (59MB -> 195MB in-APK).
-    aaptOptions {
-        noCompress 'bin', 'zip'
+    androidResources {
+        noCompress += ['bin', 'zip']
     }
 
     applicationVariants.all { variant ->
@@ -157,20 +135,40 @@ android {
             def version = variant.versionName
             def abi = output.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
             if (variant.buildType.name == "debug") {
-                outputFileName = new File("MobileCode-v" + version + "-debug_" + abi + ".apk")
+                outputFileName = "MobileCode-v" + version + "-debug_" + abi + ".apk"
             } else if (variant.buildType.name == "release") {
-                outputFileName = new File("MobileCode-v" + version + "-release_" + abi + ".apk")
+                outputFileName = "MobileCode-v" + version + "-release_" + abi + ".apk"
             }
         }
     }
 
     buildFeatures {
-        buildConfig true
-        compose true
+        buildConfig = true
+        compose = true
     }
 }
 
 dependencies {
+    implementation "androidx.annotation:annotation:1.9.0"
+    implementation "androidx.core:core:1.13.1"
+    implementation "androidx.drawerlayout:drawerlayout:1.2.0"
+    implementation "androidx.preference:preference:1.2.1"
+    implementation "androidx.viewpager:viewpager:1.0.0"
+    implementation "androidx.lifecycle:lifecycle-runtime:2.7.0"
+    implementation "androidx.room:room-runtime:2.6.1"
+    implementation "com.squareup.okhttp3:okhttp:4.11.0"
+    implementation "io.reactivex.rxjava3:rxjava:3.1.7"
+    implementation "com.google.android.material:material:1.12.0"
+    implementation "com.google.guava:guava:24.1-jre"
+    implementation "io.noties.markwon:core:$markwonVersion"
+    implementation "io.noties.markwon:ext-strikethrough:$markwonVersion"
+    implementation "io.noties.markwon:linkify:$markwonVersion"
+    implementation "io.noties.markwon:recycler:$markwonVersion"
+    implementation 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
+
+    implementation project(":terminal-view")
+    implementation project(":termux-shared")
+
     implementation platform(libs.compose.bom)
     implementation libs.activity.compose
     implementation libs.core.ktx
@@ -238,7 +236,7 @@ def downloadBootstrap(String arch, String expectedChecksum, String version) {
     file.parentFile.mkdirs()
     def out = new BufferedOutputStream(new FileOutputStream(file))
 
-    def connection = new URL(remoteUrl).openConnection()
+    def connection = URI.create(remoteUrl).toURL().openConnection()
     connection.setInstanceFollowRedirects(true)
     def digestStream = new java.security.DigestInputStream(connection.inputStream, digest)
     out << digestStream
@@ -252,13 +250,8 @@ def downloadBootstrap(String arch, String expectedChecksum, String version) {
     }
 }
 
-clean {
-    doLast {
-        def tree = fileTree(new File(projectDir, 'src/main/cpp'))
-        tree.include 'bootstrap-*.zip'
-        tree.each { it.delete() }
-    }
-}
+// Keep patched src/main/cpp/bootstrap-*.zip intact across `clean`: they are
+// tracked in git and required for local/offline builds.
 
 // ------------------------------------------------------------------
 // Workshop bundle: ONLY the Ubuntu rootfs is packed into the APK
@@ -314,7 +307,7 @@ def sha512Hex(File file) {
 def fetchUrl(String url, File dest) {
     try {
         dest.parentFile.mkdirs()
-        def connection = new URL(url).openConnection()
+        def connection = URI.create(url).toURL().openConnection()
         connection.setInstanceFollowRedirects(true)
         connection.setConnectTimeout(30000)
         connection.setReadTimeout(120000)
@@ -332,13 +325,16 @@ def fetchUrl(String url, File dest) {
     }
 }
 
-task downloadWorkshopBundle() {
+tasks.register('downloadWorkshopBundle') {
+    def workshopEnabled = project.ext.bundleWorkshop
+    def agentsEnabled = project.ext.bundleAgents
+    def bigAgentsEnabled = project.ext.bundleBigAgents
+    def assetsDir = new File(projectDir, "src/main/assets/workshop")
     doLast {
-        if (!project.ext.bundleWorkshop && !project.ext.bundleAgents) {
+        if (!workshopEnabled && !agentsEnabled) {
             logger.lifecycle("Workshop bundle: disabled via properties, skipping.")
             return
         }
-        def assetsDir = new File(projectDir, "src/main/assets/workshop")
         def manifest = new Properties()
         def manifestFile = new File(assetsDir, "bundle.properties")
         if (manifestFile.exists()) {
@@ -350,7 +346,7 @@ task downloadWorkshopBundle() {
         }
 
         // ---- Ubuntu rootfs (always bundled) ----
-        if (project.ext.bundleWorkshop) {
+        if (workshopEnabled) {
             def ubuntuRelease = "24.04.5"
             // arm64 = phones, x86_64 = emulator. Entries pin exact upstream files.
             def rootfsSpecs = [
@@ -379,7 +375,7 @@ task downloadWorkshopBundle() {
         }
 
         // ---- CLI agent binaries (testing bundle) ----
-        if (project.ext.bundleAgents) {
+        if (agentsEnabled) {
             // Antigravity: version-pinned manifest with sha512.
             try {
                 def agyKey = "agent.agy.arm64"
@@ -388,7 +384,7 @@ task downloadWorkshopBundle() {
                 if (need(agyKey, agyDest, agyRecorded)) {
                     logger.lifecycle("Workshop bundle: resolving Antigravity manifest ...")
                     def agyManifest = new groovy.json.JsonSlurper().parse(
-                        new URL("https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/linux_arm64.json"))
+                        URI.create("https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/linux_arm64.json").toURL())
                     logger.lifecycle("Workshop bundle: downloading agy " + agyManifest.version + " (~59MB) ...")
                     if (fetchUrl(agyManifest.url.toString(), agyDest)) {
                         def actual512 = sha512Hex(agyDest)
@@ -433,14 +429,14 @@ task downloadWorkshopBundle() {
                 logger.warn("Workshop bundle: opencode skipped: " + e.getMessage())
             }
 
-            if (project.ext.bundleBigAgents) {
+            if (bigAgentsEnabled) {
                 // Grok: raw ~160MB binary. Version pointer is plain text.
                 try {
                     def grokKey = "agent.grok.arm64"
                     def grokDest = new File(assetsDir, "agents/arm64/grok.bin")
                     def grokRecorded = manifest.getProperty(grokKey + ".sha256")
                     if (need(grokKey, grokDest, grokRecorded)) {
-                        def grokVersion = new URL("https://x.ai/cli/stable").getText("UTF-8").trim()
+                        def grokVersion = URI.create("https://x.ai/cli/stable").toURL().getText("UTF-8").trim()
                         def grokUrl = "https://x.ai/cli/grok-" + grokVersion + "-linux-aarch64"
                         logger.lifecycle("Workshop bundle: downloading grok " + grokVersion + " (~160MB) ...")
                         if (fetchUrl(grokUrl, grokDest)) {
@@ -506,9 +502,9 @@ afterEvaluate {
     }
 }
 
-task downloadBootstraps() {
+tasks.register('downloadBootstraps') {
+    def packageVariant = project.ext.packageVariant
     doLast {
-        def packageVariant = project.ext.packageVariant
         if (packageVariant == "apt-android-7") {
             def version = "2026.02.12-r1" + "%2B" + "apt.android-7"
             downloadBootstrap("aarch64", "ec6e302b1379e0d6bbb17146406b7101a91e128c421159821ab17b272dd610c3", version)
@@ -524,11 +520,5 @@ task downloadBootstraps() {
         } else {
             throw new GradleException("Unsupported TERMUX_PACKAGE_VARIANT \"" + packageVariant + "\"")
         }
-    }
-}
-
-afterEvaluate {
-    android.applicationVariants.all { variant ->
-        variant.javaCompileProvider.get().dependsOn(downloadBootstraps)
     }
 }

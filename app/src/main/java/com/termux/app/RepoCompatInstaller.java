@@ -48,7 +48,8 @@ public class RepoCompatInstaller {
 
     private static final String LOG_TAG = "RepoCompatInstaller";
 
-    private static final String WRAPPER_VERSION = "1";
+    private static final String WRAPPER_VERSION = "3";
+    private static final String LEGACY_PACKAGE_NAME = "com.termux";
 
     /** Write/refresh the dpkg wrapper and the apt config that points at it. */
     public static void ensureInstalled() {
@@ -62,9 +63,105 @@ public class RepoCompatInstaller {
             writeIfChanged(wrapper, wrapperScript(prefix));
             makeExecutable(wrapper);
             writeIfChanged(conf, "Dir::Bin::dpkg \"" + wrapper.getAbsolutePath() + "\";\n");
+            repairPrefixTextReferences(prefixDir);
         } catch (Exception e) {
             Logger.logError(LOG_TAG, "Failed to install repo-compat layer: " + e.getMessage());
         }
+    }
+
+    /**
+     * Repair any scripts/configs already in {@code $PREFIX} (e.g. {@code bin/pkg} or
+     * {@code bin/proot-distro}) whose shebang or paths still point at
+     * {@code /data/data/com.termux}. Also patches ELF binaries in-place if the package name length matches.
+     */
+    public static int repairPrefixTextReferences(File prefixDir) {
+        if (prefixDir == null || !prefixDir.isDirectory()) return 0;
+        String targetPkg = TermuxConstants.TERMUX_PACKAGE_NAME;
+        if (targetPkg == null || targetPkg.isEmpty() || LEGACY_PACKAGE_NAME.equals(targetPkg)) {
+            return 0;
+        }
+        int repaired = 0;
+        repaired += repairFilesInDir(new File(prefixDir, "bin"), 0, targetPkg);
+        repaired += repairFilesInDir(new File(prefixDir, "libexec"), 2, targetPkg);
+        repaired += repairFilesInDir(new File(prefixDir, "lib"), 3, targetPkg);
+        repaired += repairFilesInDir(new File(prefixDir, "etc/apt"), 1, targetPkg);
+        repaired += repairFilesInDir(new File(prefixDir, "etc/termux"), 2, targetPkg);
+        return repaired;
+    }
+
+    private static int repairFilesInDir(File dir, int maxDepth, String targetPkg) {
+        if (dir == null || !dir.isDirectory()) return 0;
+        File[] children = dir.listFiles();
+        if (children == null) return 0;
+        int repaired = 0;
+        String legacyPrefix = "/data/data/" + LEGACY_PACKAGE_NAME;
+        String targetPrefix = "/data/data/" + targetPkg;
+        byte[] legacyBytes = legacyPrefix.getBytes(StandardCharsets.UTF_8);
+        byte[] targetBytes = targetPrefix.getBytes(StandardCharsets.UTF_8);
+        boolean sameLength = (legacyBytes.length == targetBytes.length);
+        
+        for (File child : children) {
+            if (Files.isSymbolicLink(child.toPath())) continue;
+            if (child.isDirectory()) {
+                if (maxDepth > 0) {
+                    repaired += repairFilesInDir(child, maxDepth - 1, targetPkg);
+                }
+                continue;
+            }
+            if (!child.isFile() || child.length() == 0 || child.length() > 50 * 1024 * 1024) continue;
+            try {
+                byte[] raw = Files.readAllBytes(child.toPath());
+                boolean isBinary = isBinaryContent(raw);
+                if (isBinary && !sameLength) continue;
+                
+                boolean changed = false;
+                if (isBinary) {
+                    for (int i = 0; i <= raw.length - legacyBytes.length; i++) {
+                        boolean match = true;
+                        for (int j = 0; j < legacyBytes.length; j++) {
+                            if (raw[i + j] != legacyBytes[j]) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            for (int j = 0; j < targetBytes.length; j++) {
+                                raw[i + j] = targetBytes[j];
+                            }
+                            changed = true;
+                            i += targetBytes.length - 1;
+                        }
+                    }
+                } else {
+                    String text = new String(raw, StandardCharsets.UTF_8);
+                    if (text.contains(legacyPrefix)) {
+                        String updated = text.replace(legacyPrefix, targetPrefix);
+                        raw = updated.getBytes(StandardCharsets.UTF_8);
+                        changed = true;
+                    }
+                }
+                
+                if (changed) {
+                    boolean wasExecutable = child.canExecute();
+                    Files.write(child.toPath(), raw);
+                    if (wasExecutable) makeExecutable(child);
+                    repaired++;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return repaired;
+    }
+
+    private static boolean isBinaryContent(byte[] data) {
+        if (data.length >= 4 && data[0] == 0x7f && data[1] == 'E' && data[2] == 'L' && data[3] == 'F') {
+            return true;
+        }
+        int limit = Math.min(data.length, 4096);
+        for (int i = 0; i < limit; i++) {
+            if (data[i] == 0) return true;
+        }
+        return false;
     }
 
     private static void writeIfChanged(File file, String content) throws IOException {
@@ -98,6 +195,7 @@ public class RepoCompatInstaller {
             "# RepoCompatInstaller.java for the full explanation.",
             "XYZIDE_PREFIX=\"" + prefix + "\"",
             "REAL_DPKG=\"$XYZIDE_PREFIX/bin/dpkg\"",
+            "export LC_ALL=C",
             "XYZIDE_WORKDIRS=()",
             "xyzide_cleanup() {",
             "  local d",
@@ -115,9 +213,9 @@ public class RepoCompatInstaller {
             "  mkdir -p \"$tree\" || return 0",
             "  dpkg-deb -x \"$deb\" \"$tree\" 2>/dev/null || return 0",
             "  dpkg-deb -e \"$deb\" \"$tree/DEBIAN\" 2>/dev/null || return 0",
-            "  [ -d \"$tree/data/data/com.termux\" ] || return 0",
-            "  mv \"$tree/data/data/com.termux\" \"$tree/data/data/com.xyzide\" || return 0",
-            "  grep -rl 'com\\.termux' \"$tree\" 2>/dev/null | while IFS= read -r f; do",
+            "  [ -d \"$tree/data/data/\"com.termux ] || return 0",
+            "  mv \"$tree/data/data/\"com.termux \"$tree/data/data/\"com.xyzide || return 0",
+            "  find \"$tree\" -type f -exec grep -l 'com\\.termux' {} + 2>/dev/null | while IFS= read -r f; do",
             "    chmod u+w \"$f\" 2>/dev/null",
             "    sed -i 's/com\\.termux/com.xyzide/g' \"$f\" 2>/dev/null",
             "  done",
@@ -131,8 +229,12 @@ public class RepoCompatInstaller {
             "  for s in postinst preinst postrm prerm config; do",
             "    if [ -f \"$tree/DEBIAN/$s\" ]; then chmod 755 \"$tree/DEBIAN/$s\"; fi",
             "  done",
-            "  if dpkg-deb -Zgzip --build \"$tree\" \"$work/patched.deb\" >/dev/null 2>&1; then",
+            "  if dpkg-deb -Zgzip --build \"$tree\" \"$work/patched.deb\" >\"$XYZIDE_PREFIX/tmp/xyzide-build.log\" 2>&1 \\",
+            "      || dpkg-deb --build \"$tree\" \"$work/patched.deb\" >>\"$XYZIDE_PREFIX/tmp/xyzide-build.log\" 2>&1; then",
             "    XYZIDE_PATCHED=\"$work/patched.deb\"",
+            "  else",
+            "    echo \"xyzide_patch_one: dpkg-deb build failed for $deb\" >&2",
+            "    cat \"$XYZIDE_PREFIX/tmp/xyzide-build.log\" >&2",
             "  fi",
             "}",
             "",
